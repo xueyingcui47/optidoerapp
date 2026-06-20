@@ -24,9 +24,24 @@ function fmtTimeInZone(d: Date): string {
   });
 }
 
+function fmtDateInZone(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: DIGEST_TIMEZONE,
+  });
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+const CLOSING_LINES = [
+  "Take it one item at a time — you've got this. Wishing you a productive and joyful day ahead! 🌟",
+  "Pace yourself, celebrate the small wins, and don't forget to breathe between tasks. Have a wonderful day! ☀️",
+  "Here's to checking things off the list and still leaving room for something good. Make today count! 💪",
+];
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization") ?? "";
@@ -71,17 +86,40 @@ export async function GET(req: NextRequest) {
     const itemsHtml = todays
       .map((ev) => {
         const time = ev.allDay ? "All day" : fmtTimeInZone(new Date(ev.start));
-        return `<li><strong>${time}</strong> — ${escapeHtml(ev.title || "(untitled)")}</li>`;
+        return `<li style="margin-bottom: 6px;"><strong>${time}</strong> — ${escapeHtml(ev.title || "(untitled)")}</li>`;
       })
       .join("");
 
+    const firstName = (profile.name || "").trim().split(" ")[0] || "there";
+    const dateLabel = fmtDateInZone(now);
+    const count = todays.length;
+    const sizeBlurb =
+      count <= 2
+        ? "Looks like a lighter day — a good chance to get ahead on something else, too."
+        : count <= 5
+        ? "A solid lineup today — nothing you can't handle."
+        : "It's a full day — worth blocking out time for the big items first.";
+    const closing = CLOSING_LINES[Math.floor(Math.random() * CLOSING_LINES.length)];
+
     const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1e293b;">
         <div style="font-size: 20px; font-weight: 700; color: #4f46e5;">OptiDoerApp</div>
-        <h1 style="font-size: 18px; margin: 16px 0 12px;">Today's schedule</h1>
-        <ul style="font-size: 15px; line-height: 1.8; padding-left: 20px;">${itemsHtml}</ul>
-        <p style="font-size: 13px; color: #94a3b8; margin-top: 24px;">
-          You're receiving this because you have events scheduled today in OptiDoerApp.
+        <p style="font-size: 14px; color: #64748b; margin-top: 4px;">${dateLabel}</p>
+
+        <h1 style="font-size: 19px; margin: 20px 0 4px;">Good morning, ${escapeHtml(firstName)} 👋</h1>
+        <p style="font-size: 15px; line-height: 1.6;">
+          You've got <strong>${count} thing${count === 1 ? "" : "s"}</strong> on the books today. ${sizeBlurb}
+          Here's the rundown:
+        </p>
+
+        <ul style="font-size: 15px; line-height: 1.6; padding-left: 20px; margin: 16px 0;">${itemsHtml}</ul>
+
+        <p style="font-size: 15px; line-height: 1.6; margin-top: 20px;">${closing}</p>
+
+        <p style="font-size: 15px; margin-top: 20px;">— The OptiDoerApp Team</p>
+
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+          You're receiving this because you have events scheduled today in OptiDoerApp. Open the app anytime to add, edit, or reschedule.
         </p>
       </div>`;
 
