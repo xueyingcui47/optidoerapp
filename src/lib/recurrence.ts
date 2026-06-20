@@ -59,7 +59,10 @@ function occurrenceStart(base: Date, ev: CalendarEvent, index: number): Date {
 
 /** Expand one event into its occurrences whose start falls within [rangeStart, rangeEnd]. */
 export function expandOccurrences(ev: CalendarEvent, rangeStart: Date, rangeEnd: Date): CalendarEvent[] {
-  if (ev.recurrence === "none") return [ev];
+  if (ev.recurrence === "none") {
+    const touchesRange = new Date(ev.start) <= rangeEnd && new Date(ev.end) >= rangeStart;
+    return touchesRange ? [ev] : [];
+  }
 
   const baseStart = new Date(ev.start);
   const duration = new Date(ev.end).getTime() - baseStart.getTime();
