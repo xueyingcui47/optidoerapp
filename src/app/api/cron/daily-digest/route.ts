@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { fromDbEvent } from "@/lib/db";
 import { expandEventsInRange } from "@/lib/recurrence";
-import { fmtTime } from "@/lib/date";
 
 export const runtime = "nodejs";
 
@@ -10,9 +9,20 @@ export const runtime = "nodejs";
 // Vercel 会自动在请求头里带上 Authorization: Bearer <CRON_SECRET>，下面做校验防止被外部乱调用。
 //
 // 已知限制（MVP，先用着，之后想做更准的再改）：
-// "今天"按 UTC 自然日算，不是按每个用户自己的时区——比如 UTC 13:00 跑的话，对美西用户来说
-// 還是前一天凌晨 5-6 点，邮件里的"今天"会有点错位。要做对，需要给每个用户存时区、按时区分批发，
-// 这个量先不做，等用户规模上来了再优化。
+// ① "今天"按 UTC 自然日算，不是按每个用户自己的时区——比如 UTC 13:00 跑的话，对美西用户来说
+// 還是前一天凌晨 5-6 点，邮件里的"今天"会有点错位。
+// ② 邮件里显示的时间用的是 DIGEST_TIMEZONE 这个固定时区（默认美西），不是每个用户各自的时区——
+// 服务端跑在 Vercel 上默认是 UTC，不能像浏览器那样用 toLocaleTimeString() 自动取当地时区。
+// 要做对都需要给每个用户存时区、按时区分批发，这个量先不做，等用户规模上来了再优化。
+const DIGEST_TIMEZONE = process.env.DIGEST_TIMEZONE || "America/Los_Angeles";
+
+function fmtTimeInZone(d: Date): string {
+  return d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: DIGEST_TIMEZONE,
+  });
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -60,7 +70,7 @@ export async function GET(req: NextRequest) {
 
     const itemsHtml = todays
       .map((ev) => {
-        const time = ev.allDay ? "All day" : fmtTime(new Date(ev.start));
+        const time = ev.allDay ? "All day" : fmtTimeInZone(new Date(ev.start));
         return `<li><strong>${time}</strong> — ${escapeHtml(ev.title || "(untitled)")}</li>`;
       })
       .join("");
