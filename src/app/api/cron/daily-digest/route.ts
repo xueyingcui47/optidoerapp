@@ -82,9 +82,9 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "OptiDoerApp <noreply@optidoerapp.com>",
+        from: "OptiDoerApp <todaytask@optidoerapp.com>",
         to: profile.email,
-        subject: `Today's schedule (${todays.length} item${todays.length === 1 ? "" : "s"})`,
+        subject: "Your Daily Digest",
         html,
       }),
     });
