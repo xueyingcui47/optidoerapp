@@ -96,29 +96,29 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white">
-        <div className="flex items-center gap-2">
-          <button onClick={() => move(-1)} className="navbtn">
+      <header className="flex flex-wrap items-center gap-2 justify-between px-3 sm:px-5 py-3 border-b border-slate-200 bg-white">
+        <div className="flex items-center gap-2 min-w-0">
+          <button onClick={() => move(-1)} className="navbtn shrink-0">
             ‹
           </button>
           <button
             onClick={() => setCursor(new Date())}
-            className="text-sm px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100"
+            className="text-sm px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100 shrink-0"
           >
             Today
           </button>
-          <button onClick={() => move(1)} className="navbtn">
+          <button onClick={() => move(1)} className="navbtn shrink-0">
             ›
           </button>
-          <h1 className="ml-2 text-lg font-semibold text-slate-800">{title}</h1>
+          <h1 className="ml-1 text-sm sm:text-lg font-semibold text-slate-800 truncate">{title}</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex rounded-lg border border-slate-300 p-0.5 text-sm">
             {(["month", "week", "day"] as View[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1 rounded-md ${
+                className={`px-2 sm:px-3 py-1 rounded-md ${
                   view === v ? "bg-brand-600 text-white" : "text-slate-600"
                 }`}
               >
@@ -128,9 +128,10 @@ export default function CalendarPage() {
           </div>
           <button
             onClick={() => openNew(view === "month" ? new Date() : cursor)}
-            className="text-sm bg-brand-600 text-white rounded-lg px-3 py-1.5 hover:bg-brand-700"
+            className="text-sm bg-brand-600 text-white rounded-lg px-3 py-1.5 hover:bg-brand-700 whitespace-nowrap"
           >
-            ＋ New / AI create
+            <span className="sm:hidden">＋ New</span>
+            <span className="hidden sm:inline">＋ New / AI create</span>
           </button>
         </div>
       </header>
@@ -233,7 +234,7 @@ function MonthGrid({
           <div
             key={i}
             onClick={() => onDayClick(day)}
-            className={`min-h-[96px] border-r border-b border-slate-200 p-1 cursor-pointer hover:bg-slate-50 ${
+            className={`min-h-[64px] sm:min-h-[96px] border-r border-b border-slate-200 p-0.5 sm:p-1 cursor-pointer hover:bg-slate-50 ${
               inMonth ? "" : "bg-slate-50/60"
             }`}
           >
@@ -289,7 +290,8 @@ function TimeGrid({
   const HOUR_PX = 48;
 
   return (
-    <div className="bg-white">
+    <div className="bg-white overflow-x-auto">
+      <div style={{ minWidth: 48 + days.length * 64 }}>
       {/* 头部日期 */}
       <div className="grid sticky top-0 z-10 bg-white border-b border-slate-200" style={cols(days.length)}>
         <div className="border-r border-slate-200" />
@@ -362,10 +364,11 @@ function TimeGrid({
           );
         })}
       </div>
+      </div>
     </div>
   );
 }
 
 function cols(n: number): React.CSSProperties {
-  return { gridTemplateColumns: `48px repeat(${n}, minmax(0, 1fr))` };
+  return { gridTemplateColumns: `48px repeat(${n}, minmax(64px, 1fr))` };
 }

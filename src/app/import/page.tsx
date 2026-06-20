@@ -41,7 +41,7 @@ export default function ImportPage() {
   const [source, setSource] = useState<Source>("csv");
   const { state } = useStore();
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-800">Import / Export</h1>
         <p className="text-slate-500 text-sm">
@@ -49,7 +49,7 @@ export default function ImportPage() {
         </p>
       </header>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="text-sm font-medium text-slate-700">Export all data</div>
           <p className="text-xs text-slate-500">

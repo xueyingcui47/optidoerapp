@@ -23,8 +23,8 @@ export default function RemindersPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <header className="flex items-center justify-between">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Reminders</h1>
           <p className="text-slate-500 text-sm">Event and note reminders for the next 30 days</p>

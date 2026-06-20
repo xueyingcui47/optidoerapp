@@ -102,14 +102,14 @@ export default function AdminPage() {
 
   if (!supabaseEnabled) {
     return (
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <p className="text-sm text-slate-500">The admin backend needs Supabase configured first (see .env.local).</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
       <header>
         <h1 className="text-2xl font-bold text-slate-800">Admin</h1>
         <p className="text-slate-500 text-sm">

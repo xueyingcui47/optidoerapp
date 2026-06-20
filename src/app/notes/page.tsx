@@ -39,8 +39,12 @@ export default function NotesPage() {
 
   return (
     <div className="flex h-full">
-      {/* List */}
-      <div className="w-80 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+      {/* List — on mobile, hidden once a note is selected (editor takes over the screen) */}
+      <div
+        className={`w-full md:w-80 shrink-0 border-r border-slate-200 bg-white flex-col ${
+          selected ? "hidden md:flex" : "flex"
+        }`}
+      >
         <div className="p-3 border-b border-slate-200 space-y-2">
           <button
             onClick={handleNew}
@@ -97,8 +101,8 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 min-w-0 overflow-auto">
+      {/* Editor — on mobile, only shown once a note is selected */}
+      <div className={`flex-1 min-w-0 overflow-auto ${selected ? "block" : "hidden md:block"}`}>
         {!selected ? (
           <div className="h-full flex items-center justify-center text-slate-400">
             Select a note, or create a new one.
@@ -112,6 +116,7 @@ export default function NotesPage() {
               deleteNote(selected.id);
               setSelectedId(null);
             }}
+            onBack={() => setSelectedId(null)}
           />
         )}
       </div>
@@ -123,15 +128,23 @@ function NoteEditor({
   note,
   onChange,
   onDelete,
+  onBack,
 }: {
   note: ReturnType<typeof useStore>["state"]["notes"][number];
   onChange: (patch: Partial<typeof note>) => void;
   onDelete: () => void;
+  onBack: () => void;
 }) {
   const [tagInput, setTagInput] = useState("");
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-4">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
+      <button
+        onClick={onBack}
+        className="md:hidden text-sm text-brand-600 hover:underline -mt-1"
+      >
+        ← Notes
+      </button>
       <div className="flex items-center gap-2">
         <input
           value={note.title}
