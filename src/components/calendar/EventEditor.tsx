@@ -34,6 +34,8 @@ export function EventEditor({
   const [occurrencesInput, setOccurrencesInput] = useState(String(initial.recurrenceOccurrences ?? 5));
   const endless = draft.recurrenceOccurrences == null;
   const [showDeleteChoice, setShowDeleteChoice] = useState(false);
+  const dateError =
+    new Date(draft.end) < new Date(draft.start) ? "End must be on or after the start." : null;
 
   // AI natural-language input
   const [nl, setNl] = useState("");
@@ -97,6 +99,7 @@ export function EventEditor({
   };
 
   const save = () => {
+    if (dateError) return;
     if (editingId) updateEvent(editingId, draft);
     else addEvent(draft);
     onClose();
@@ -179,11 +182,17 @@ export function EventEditor({
                     ? toLocalInputValue(new Date(draft.start)).slice(0, 10)
                     : toLocalInputValue(new Date(draft.start))
                 }
-                onChange={(e) =>
-                  set({
-                    start: (draft.allDay ? parseLocalDateOnly(e.target.value) : new Date(e.target.value)).toISOString(),
-                  })
-                }
+                onChange={(e) => {
+                  const newStart = draft.allDay
+                    ? parseLocalDateOnly(e.target.value)
+                    : new Date(e.target.value);
+                  // Changing the start resets the end to match (same day, or +1h if timed) —
+                  // if you want a multi-day span, stretch the end afterward.
+                  const newEnd = draft.allDay
+                    ? new Date(newStart)
+                    : new Date(newStart.getTime() + 60 * 60 * 1000);
+                  set({ start: newStart.toISOString(), end: newEnd.toISOString() });
+                }}
                 className="input"
               />
             </Field>
@@ -203,6 +212,7 @@ export function EventEditor({
                 }
                 className="input"
               />
+              {dateError && <p className="text-xs text-red-600 mt-1">{dateError}</p>}
             </Field>
           </div>
 
@@ -369,7 +379,8 @@ export function EventEditor({
             </button>
             <button
               onClick={save}
-              className="text-sm bg-brand-600 text-white rounded px-4 py-1.5 hover:bg-brand-700"
+              disabled={!!dateError}
+              className="text-sm bg-brand-600 text-white rounded px-4 py-1.5 hover:bg-brand-700 disabled:opacity-50"
             >
               Save
             </button>

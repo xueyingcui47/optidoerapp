@@ -58,15 +58,12 @@ export function upcomingReminders(state: AppState, horizonDays = 30): ReminderIn
   return out.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
+/** Events whose [start, end] span touches this day at all — not just events that start on it. */
 export function eventsOnDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  const y = day.getFullYear();
-  const m = day.getMonth();
-  const d = day.getDate();
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 86_400_000 - 1);
   return events
-    .filter((ev) => {
-      const s = new Date(ev.start);
-      return s.getFullYear() === y && s.getMonth() === m && s.getDate() === d;
-    })
+    .filter((ev) => new Date(ev.start) <= dayEnd && new Date(ev.end) >= dayStart)
     .sort((a, b) => +new Date(a.start) - +new Date(b.start));
 }
 

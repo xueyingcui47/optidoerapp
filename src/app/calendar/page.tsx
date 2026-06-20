@@ -335,8 +335,12 @@ function TimeGrid({
                 />
               ))}
               {dayEvents.map((ev) => {
-                const s = new Date(ev.start);
-                const e = new Date(ev.end);
+                // Clip multi-day events to just this day's portion, so each day shows
+                // (and positions) only the slice of the event that actually falls on it.
+                const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+                const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+                const s = new Date(Math.max(new Date(ev.start).getTime(), dayStart.getTime()));
+                const e = new Date(Math.min(new Date(ev.end).getTime(), dayEnd.getTime()));
                 const top = (s.getHours() + s.getMinutes() / 60) * HOUR_PX;
                 const height = Math.max(
                   18,
