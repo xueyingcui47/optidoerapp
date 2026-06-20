@@ -7,3 +7,15 @@ next-env.d.ts
 .env.local
 *.tsbuildinfo
 .DS_Store
+
+# Capacitor native build artifacts (the android/ and ios/ project folders themselves are committed)
+android/app/build
+android/.gradle
+android/local.properties
+android/captures
+ios/App/Pods
+ios/App/build
+ios/App/.build
+ios/App/App.xcworkspace/xcuserdata
+ios/App/App.xcodeproj/xcuserdata
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata
