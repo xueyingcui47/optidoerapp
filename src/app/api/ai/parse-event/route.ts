@@ -54,12 +54,11 @@ const SCHEMA = {
   ],
 } as const;
 
-async function parseWithClaude(text: string, nowISO: string): Promise<ParsedEventDraft> {
+async function parseWithClaude(text: string, nowISO: string, tz: string): Promise<ParsedEventDraft> {
   // 动态导入：未安装 SDK / 未配置 key 的环境照样能跑 mock。
   const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   const response = await client.messages.create({
     model,
@@ -81,7 +80,7 @@ async function parseWithClaude(text: string, nowISO: string): Promise<ParsedEven
 }
 
 export async function POST(req: NextRequest) {
-  let body: { text?: string; now?: string };
+  let body: { text?: string; now?: string; tz?: string };
   try {
     body = await req.json();
   } catch {
@@ -93,12 +92,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
   }
   const nowISO = body.now || new Date().toISOString();
+  // 必须用客户端浏览器自己上报的时区——服务端跑在 Vercel 上默认是 UTC，
+  // 不能用 Intl.DateTimeFormat().resolvedOptions().timeZone 去猜，那只会拿到服务器的时区。
+  const tz = body.tz || "UTC";
 
   const hasKey = !!process.env.ANTHROPIC_API_KEY;
 
   if (hasKey) {
     try {
-      const draft = await parseWithClaude(text, nowISO);
+      const draft = await parseWithClaude(text, nowISO, tz);
       return NextResponse.json({ draft, engine: "claude" });
     } catch (err) {
       // Claude 失败时优雅降级到 mock，绝不中断用户流程（对应 AI 指南 3.1「错误处理与降级」）。

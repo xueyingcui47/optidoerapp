@@ -11,7 +11,11 @@ export async function parseEvent(text: string): Promise<ParseResult> {
   const res = await fetch("/api/ai/parse-event", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, now: new Date().toISOString() }),
+    body: JSON.stringify({
+      text,
+      now: new Date().toISOString(),
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }),
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
