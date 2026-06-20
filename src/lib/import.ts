@@ -317,11 +317,9 @@ export function rowsToEventDrafts(
     const allDay = /^(1|true|yes|y|是)$/i.test(get("allDay"));
     const start = parseLooseDate(get("start"));
     if (!start && !allDay) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 0, 0);
-      ok.push({ title, start: today.toISOString(), end: end.toISOString(), location: get("location"), description: get("description"), allDay: true });
+      // 没有日期的行不该被默默塞成"今天的全天事件"——那会让它每天在 Daily Digest 里
+      // 反复出现（导入当天恰好就是"今天"）。没日期就跳过，提示用户改成导入到笔记里。
+      errors.push({ row: idx + 1, reason: "No date — import as a note instead, or fix the date column" });
       return;
     }
     const startD = start ?? new Date();
