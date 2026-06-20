@@ -290,8 +290,7 @@ function TimeGrid({
   const HOUR_PX = 48;
 
   return (
-    <div className="bg-white overflow-x-auto">
-      <div style={{ minWidth: 48 + days.length * 64 }}>
+    <div className="bg-white">
       {/* 头部日期 */}
       <div className="grid sticky top-0 z-10 bg-white border-b border-slate-200" style={cols(days.length)}>
         <div className="border-r border-slate-200" />
@@ -364,11 +363,10 @@ function TimeGrid({
           );
         })}
       </div>
-      </div>
     </div>
   );
 }
 
 function cols(n: number): React.CSSProperties {
-  return { gridTemplateColumns: `48px repeat(${n}, minmax(64px, 1fr))` };
+  return { gridTemplateColumns: `48px repeat(${n}, minmax(0, 1fr))` };
 }
