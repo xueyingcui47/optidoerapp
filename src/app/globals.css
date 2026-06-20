@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+}
+
+/* 富文本编辑器最小样式 */
+.rte-content {
+  @apply text-slate-800;
+}
+.rte-content h1 {
+  @apply text-2xl font-bold my-2;
+}
+.rte-content h2 {
+  @apply text-xl font-semibold my-2;
+}
+.rte-content ul {
+  @apply list-disc pl-6 my-2;
+}
+.rte-content ol {
+  @apply list-decimal pl-6 my-2;
+}
+.rte-content blockquote {
+  @apply border-l-4 border-slate-300 pl-3 text-slate-600 my-2;
+}
+.rte-content pre {
+  @apply bg-slate-100 rounded p-3 font-mono text-sm my-2 overflow-x-auto;
+}
+.rte-content a {
+  @apply text-brand-600 underline;
+}
+.rte-content:empty::before {
+  content: attr(data-placeholder);
+  @apply text-slate-400;
+}
