@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { isNativeApp } from "@/lib/platform";
+import { supabase } from "@/lib/supabaseClient";
+import { startCheckout, stripeEnabled } from "@/lib/stripeClient";
 
 // Hard paywall (SOW 4.5): locks core features once the trial ends without a subscription,
 // keeping only "view + subscribe" access so data is never held hostage.
@@ -35,9 +37,30 @@ export function PlanCard({
   onSubscribe: (tier: "tier1" | "tier2", billing: "monthly" | "yearly") => void;
 }) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
+  const [busy, setBusy] = useState(false);
   const p = PRICING[tier];
   const price = billing === "monthly" ? p.monthly : p.yearly;
   const pct = yearlyDiscountPct(p.monthly, p.yearly);
+
+  const handleChoose = async () => {
+    if (!stripeEnabled || !supabase) {
+      onSubscribe(tier, billing);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      onSubscribe(tier, billing);
+      return;
+    }
+    setBusy(true);
+    try {
+      await startCheckout(tier, billing, token);
+    } catch (err) {
+      alert((err as Error).message);
+      setBusy(false);
+    }
+  };
 
   return (
     <div
@@ -102,14 +125,15 @@ export function PlanCard({
         </div>
       ) : (
         <button
-          onClick={() => onSubscribe(tier, billing)}
-          className={`mt-4 rounded-lg font-medium py-2 transition ${
+          onClick={handleChoose}
+          disabled={busy}
+          className={`mt-4 rounded-lg font-medium py-2 transition disabled:opacity-50 ${
             highlight
               ? "bg-brand-600 text-white hover:bg-brand-700"
               : "border border-slate-300 text-slate-700 hover:bg-slate-100"
           }`}
         >
-          Choose this plan
+          {busy ? "Redirecting…" : "Choose this plan"}
         </button>
       )}
     </div>
@@ -135,7 +159,9 @@ export function Paywall() {
         </div>
 
         <p className="text-xs text-slate-400 text-center mt-5">
-          MVP demo: this simulates a successful subscription — no real payment yet (Stripe / Apple IAP / Google Play is Phase 2).
+          {stripeEnabled
+            ? "Test mode — use Stripe's test card 4242 4242 4242 4242, any future date, any CVC."
+            : "MVP demo: this simulates a successful subscription — no real payment yet (Stripe / Apple IAP / Google Play is Phase 2)."}
         </p>
       </div>
     </div>

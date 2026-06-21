@@ -74,6 +74,9 @@ export interface Account {
   /** 邀请人靠"邀请到付费用户"攒到的会员有效期延长——现在订阅是模拟的没有真实账期，
    *  先记着这个日期，以后接真实账期时用来抵扣/跳过下一次扣款。 */
   membershipCreditUntil: string | null;
+  /** 真实 Stripe 订阅时才有值——webhook 写入，前端只用来判断"是不是走 Stripe 真实订阅"。 */
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 }
 
 export interface AppSettings {

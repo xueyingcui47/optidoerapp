@@ -22,6 +22,9 @@ create table if not exists public.profiles (
   referred_by text,
   trial_days int not null default 15,
   membership_credit_until timestamptz,
+  -- 真实 Stripe 订阅的账号/订单 ID（webhook 用来找回是哪个用户、之后管理订阅用）。
+  stripe_customer_id text,
+  stripe_subscription_id text,
   created_at timestamptz not null default now()
 );
 

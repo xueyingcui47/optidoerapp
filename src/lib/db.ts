@@ -17,6 +17,8 @@ export function fromDbProfile(row: any): Account {
     referredBy: row.referred_by ?? null,
     trialDays: row.trial_days ?? 15,
     membershipCreditUntil: row.membership_credit_until ?? null,
+    stripeCustomerId: row.stripe_customer_id ?? null,
+    stripeSubscriptionId: row.stripe_subscription_id ?? null,
   };
 }
 

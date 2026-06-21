@@ -325,6 +325,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             referredBy: null,
             trialDays: 15,
             membershipCreditUntil: null,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
           },
         }));
       },

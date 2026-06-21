@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { PRICING, PlanCard } from "@/components/Paywall";
-import { supabaseEnabled } from "@/lib/supabaseClient";
+import { supabase, supabaseEnabled } from "@/lib/supabaseClient";
 import { isNativeApp } from "@/lib/platform";
+import { openBillingPortal, stripeEnabled } from "@/lib/stripeClient";
 
 export default function SettingsPage() {
   const {
@@ -20,10 +22,26 @@ export default function SettingsPage() {
   const s = state.settings;
   const account = state.account;
   const inApp = isNativeApp();
+  const usesStripe = stripeEnabled && !!account?.stripeSubscriptionId;
+  const [portalBusy, setPortalBusy] = useState(false);
   const inFirstMonth =
     !!account?.subscribedAt &&
     account.billing === "monthly" &&
     Date.now() - new Date(account.subscribedAt).getTime() < 30 * 86_400_000;
+
+  const handleManageBilling = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    setPortalBusy(true);
+    try {
+      await openBillingPortal(token);
+    } catch (err) {
+      alert((err as Error).message);
+      setPortalBusy(false);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
@@ -64,43 +82,53 @@ export default function SettingsPage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                 To change your plan or billing, visit optidoerapp.com on the web.
               </div>
+            ) : usesStripe ? (
+              <button
+                onClick={handleManageBilling}
+                disabled={portalBusy}
+                className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {portalBusy ? "Redirecting…" : "Manage billing (switch plan, change billing, cancel)"}
+              </button>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => subscribe(account.plan === "tier2" ? "tier1" : "tier2", account.billing ?? "monthly")}
-                  className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
-                >
-                  Switch to {account.plan === "tier2" ? PRICING.tier1.label : PRICING.tier2.label}
-                </button>
-                {account.billing === "yearly" ? (
-                  !account.pendingBilling && (
-                    <button
-                      onClick={() => subscribe(account.plan ?? "tier1", "monthly")}
-                      className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
-                    >
-                      Switch to monthly billing (at term end)
-                    </button>
-                  )
-                ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => subscribe(account.plan ?? "tier1", "yearly")}
+                    onClick={() => subscribe(account.plan === "tier2" ? "tier1" : "tier2", account.billing ?? "monthly")}
                     className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
                   >
-                    Switch to yearly billing
+                    Switch to {account.plan === "tier2" ? PRICING.tier1.label : PRICING.tier2.label}
                   </button>
-                )}
-              </div>
+                  {account.billing === "yearly" ? (
+                    !account.pendingBilling && (
+                      <button
+                        onClick={() => subscribe(account.plan ?? "tier1", "monthly")}
+                        className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+                      >
+                        Switch to monthly billing (at term end)
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={() => subscribe(account.plan ?? "tier1", "yearly")}
+                      className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+                    >
+                      Switch to yearly billing
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm("Cancel your subscription? You'll lose access to paid features immediately.")) {
+                      cancelSubscription();
+                    }
+                  }}
+                  className="text-sm text-red-600 hover:underline"
+                >
+                  Cancel subscription
+                </button>
+              </>
             )}
-            <button
-              onClick={() => {
-                if (confirm("Cancel your subscription? You'll lose access to paid features immediately.")) {
-                  cancelSubscription();
-                }
-              }}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Cancel subscription
-            </button>
           </div>
         ) : (
           <div className="py-3 space-y-3">
