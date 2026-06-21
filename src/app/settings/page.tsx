@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { fmtDate, fmtDateTime } from "@/lib/date";
 import { PRICING, PlanCard } from "@/components/Paywall";
 import { supabaseEnabled } from "@/lib/supabaseClient";
+import { isNativeApp } from "@/lib/platform";
 
 export default function SettingsPage() {
   const {
@@ -18,6 +19,7 @@ export default function SettingsPage() {
   } = useStore();
   const s = state.settings;
   const account = state.account;
+  const inApp = isNativeApp();
   const inFirstMonth =
     !!account?.subscribedAt &&
     account.billing === "monthly" &&
@@ -58,31 +60,37 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => subscribe(account.plan === "tier2" ? "tier1" : "tier2", account.billing ?? "monthly")}
-                className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
-              >
-                Switch to {account.plan === "tier2" ? PRICING.tier1.label : PRICING.tier2.label}
-              </button>
-              {account.billing === "yearly" ? (
-                !account.pendingBilling && (
-                  <button
-                    onClick={() => subscribe(account.plan ?? "tier1", "monthly")}
-                    className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
-                  >
-                    Switch to monthly billing (at term end)
-                  </button>
-                )
-              ) : (
+            {inApp ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                To change your plan or billing, visit optidoerapp.com on the web.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => subscribe(account.plan ?? "tier1", "yearly")}
+                  onClick={() => subscribe(account.plan === "tier2" ? "tier1" : "tier2", account.billing ?? "monthly")}
                   className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
                 >
-                  Switch to yearly billing
+                  Switch to {account.plan === "tier2" ? PRICING.tier1.label : PRICING.tier2.label}
                 </button>
-              )}
-            </div>
+                {account.billing === "yearly" ? (
+                  !account.pendingBilling && (
+                    <button
+                      onClick={() => subscribe(account.plan ?? "tier1", "monthly")}
+                      className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+                    >
+                      Switch to monthly billing (at term end)
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={() => subscribe(account.plan ?? "tier1", "yearly")}
+                    className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+                  >
+                    Switch to yearly billing
+                  </button>
+                )}
+              </div>
+            )}
             <button
               onClick={() => {
                 if (confirm("Cancel your subscription? You'll lose access to paid features immediately.")) {

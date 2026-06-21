@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useStore } from "@/lib/store";
+import { isNativeApp } from "@/lib/platform";
 
 // Hard paywall (SOW 4.5): locks core features once the trial ends without a subscription,
 // keeping only "view + subscribe" access so data is never held hostage.
@@ -95,16 +96,22 @@ export function PlanCard({
         ))}
       </ul>
 
-      <button
-        onClick={() => onSubscribe(tier, billing)}
-        className={`mt-4 rounded-lg font-medium py-2 transition ${
-          highlight
-            ? "bg-brand-600 text-white hover:bg-brand-700"
-            : "border border-slate-300 text-slate-700 hover:bg-slate-100"
-        }`}
-      >
-        Choose this plan
-      </button>
+      {isNativeApp() ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-xs text-slate-500">
+          Subscribe at optidoerapp.com
+        </div>
+      ) : (
+        <button
+          onClick={() => onSubscribe(tier, billing)}
+          className={`mt-4 rounded-lg font-medium py-2 transition ${
+            highlight
+              ? "bg-brand-600 text-white hover:bg-brand-700"
+              : "border border-slate-300 text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          Choose this plan
+        </button>
+      )}
     </div>
   );
 }
