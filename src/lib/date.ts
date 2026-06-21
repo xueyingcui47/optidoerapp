@@ -88,11 +88,11 @@ export function fmtMonthYear(d: Date): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long" });
 }
 
-/** 试用剩余天数（向上取整，最少 0）。 */
-export function trialDaysLeft(trialStartedAt: string): number {
+/** 试用剩余天数（向上取整，最少 0）。totalDays 默认 15，被邀请注册的账号是 45。 */
+export function trialDaysLeft(trialStartedAt: string, totalDays: number = TRIAL_DAYS): number {
   const start = new Date(trialStartedAt).getTime();
   const elapsed = Date.now() - start;
-  return Math.max(0, TRIAL_DAYS - Math.floor(elapsed / MS_DAY));
+  return Math.max(0, totalDays - Math.floor(elapsed / MS_DAY));
 }
 
 /**

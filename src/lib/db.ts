@@ -11,6 +11,10 @@ export function fromDbProfile(row: any): Account {
     plan: row.plan ?? null,
     billing: row.billing ?? null,
     subscribedAt: row.subscribed_at ?? null,
+    referralCode: row.referral_code ?? "",
+    referredBy: row.referred_by ?? null,
+    trialDays: row.trial_days ?? 15,
+    membershipCreditUntil: row.membership_credit_until ?? null,
   };
 }
 

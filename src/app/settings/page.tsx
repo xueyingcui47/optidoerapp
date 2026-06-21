@@ -89,6 +89,37 @@ export default function SettingsPage() {
         )}
       </Section>
 
+      {/* Referral */}
+      {account?.referralCode && (
+        <Section title="Invite friends">
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-slate-600">
+              Share your code — anyone who signs up with it gets a <strong>45-day trial</strong>{" "}
+              instead of the usual 15. {account.subscribed
+                ? "Since you're a subscriber, you'll also get a free month added to your membership for every friend who joins."
+                : "Subscribe to also start earning a free month of membership for every friend who joins using your code."}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="text-base font-mono font-semibold bg-slate-100 text-slate-800 rounded-lg px-3 py-1.5">
+                {account.referralCode}
+              </code>
+              <button
+                onClick={() => navigator.clipboard?.writeText(account.referralCode)}
+                className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+              >
+                Copy
+              </button>
+            </div>
+            {account.membershipCreditUntil && new Date(account.membershipCreditUntil) > new Date() && (
+              <p className="text-xs text-emerald-600">
+                Referral credits have your membership covered through{" "}
+                {new Date(account.membershipCreditUntil).toLocaleDateString()}.
+              </p>
+            )}
+          </div>
+        </Section>
+      )}
+
       {/* AI */}
       <Section title="AI features">
         <Toggle

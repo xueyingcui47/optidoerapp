@@ -60,6 +60,15 @@ export interface Account {
   billing: "monthly" | "yearly" | null;
   /** 订阅生效时间，用于判断是否仍在首月优惠期（月付首月 $0.01）。 */
   subscribedAt: string | null;
+  /** 这个账号自己的邀请码，注册时数据库自动生成。 */
+  referralCode: string;
+  /** 注册时用了谁的邀请码（一次性，没有就是 null）。 */
+  referredBy: string | null;
+  /** 试用总天数，默认 15；被邀请注册成功会变成 45。 */
+  trialDays: number;
+  /** 邀请人靠"邀请到付费用户"攒到的会员有效期延长——现在订阅是模拟的没有真实账期，
+   *  先记着这个日期，以后接真实账期时用来抵扣/跳过下一次扣款。 */
+  membershipCreditUntil: string | null;
 }
 
 export interface AppSettings {

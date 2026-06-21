@@ -16,6 +16,7 @@ function AuthForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -49,7 +50,7 @@ function AuthForm() {
     setBusy(true);
     const res =
       mode === "signup"
-        ? await signUp(name.trim(), email.trim(), password)
+        ? await signUp(name.trim(), email.trim(), password, referralCode.trim())
         : await signIn(email.trim(), password);
     setBusy(false);
     if (res.error) {
@@ -134,6 +135,19 @@ function AuthForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
                 placeholder="At least 6 characters"
+              />
+            </div>
+          )}
+          {mode === "signup" && (
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">
+                Referral code <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                placeholder="Got an invite code? Enter it for a 45-day trial"
               />
             </div>
           )}

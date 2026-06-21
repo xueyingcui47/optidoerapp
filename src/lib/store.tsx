@@ -117,7 +117,9 @@ interface StoreApi {
   locked: boolean; // 试用到期且未订阅 → 硬付费墙
 
   // Supabase 账号系统（未配置 Supabase 时这三个会返回错误，UI 应回退到 createAccount 本地模式）
-  signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
+  // referralCode 可选：填了别人的邀请码，注册时数据库会自动把自己的试用延长到 45 天，
+  // 同时如果邀请人当时是付费用户，邀请人会得到 1 个月的会员有效期延长（见 schema.sql 的触发器）。
+  signUp: (name: string, email: string, password: string, referralCode?: string) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 
@@ -247,7 +249,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const trialLeft = state.account
       ? state.account.subscribed
         ? Infinity
-        : trialDaysLeft(state.account.trialStartedAt)
+        : trialDaysLeft(state.account.trialStartedAt, state.account.trialDays)
       : 0;
 
     const locked =
@@ -280,6 +282,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             plan: null,
             billing: null,
             subscribedAt: null,
+            referralCode: "",
+            referredBy: null,
+            trialDays: 15,
+            membershipCreditUntil: null,
           },
         }));
       },
@@ -295,12 +301,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState(EMPTY_STATE);
       },
 
-      signUp: async (name, email, password) => {
+      signUp: async (name, email, password, referralCode) => {
         if (!supabase) return { error: "Supabase is not configured (missing NEXT_PUBLIC_SUPABASE_* in .env.local)." };
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name } },
+          options: { data: { name, referral_code: referralCode?.trim() || null } },
         });
         if (error) return { error: error.message };
         if (data.session) {

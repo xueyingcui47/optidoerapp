@@ -11,6 +11,14 @@ create table if not exists public.profiles (
   plan text check (plan in ('tier1', 'tier2')),
   billing text check (billing in ('monthly', 'yearly')),
   subscribed_at timestamptz,
+  -- 邀请功能：referral_code 是这个用户自己的邀请码（注册时自动生成）；referred_by 记录
+  -- 这个用户注册时用了谁的邀请码（一次性，用过就不能再用别的码）；trial_days 默认 15，
+  -- 被邀请注册成功后改成 45；membership_credit_until 是邀请人攒到的"会员有效期延长"——
+  -- 现在订阅是模拟的没有真实账期，先记下这个日期，以后接真实 Stripe 账期时用来抵扣/跳过下一次扣款。
+  referral_code text unique,
+  referred_by text,
+  trial_days int not null default 15,
+  membership_credit_until timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -23,12 +31,47 @@ create policy "用户可建自己的 profile" on public.profiles
 create policy "用户可改自己的 profile" on public.profiles
   for update using (auth.uid() = id);
 
--- 新用户注册时自动建一行 profile（trial 从此刻开始）。
+-- 新用户注册时自动建一行 profile（trial 从此刻开始），同时生成一个 8 位邀请码。
+-- 如果注册时带了别人的邀请码（前端把它塞进 auth signUp 的 user_metadata.referral_code）：
+--   · 自己的试用天数改成 45（trial_days）。
+--   · 只有邀请人在这一刻本人是「已订阅」状态，才给邀请人加 1 个月的会员有效期延长
+--     （membership_credit_until 往后推 1 个月，叠加在原有的延长之上）——这是题目要求的
+--     "优惠只限于付费用户"。试用期用户分享邀请码邀到人也不会有任何奖励。
+-- 这段逻辑放在数据库触发器里（而不是前端再调一次 API）是因为：如果项目开了邮箱验证，
+-- signUp() 当下根本拿不到登录 session，没法再补发一个"兑换邀请码"的请求；放触发器里
+-- 保证不管要不要邮箱验证，注册这一下子就把邀请关系处理完，不依赖后续任何步骤。
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  ref_code text;
+  referrer public.profiles;
 begin
-  insert into public.profiles (id, name, email)
-  values (new.id, coalesce(new.raw_user_meta_data->>'name', ''), new.email);
+  insert into public.profiles (id, name, email, referral_code)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    new.email,
+    upper(substr(replace(new.id::text, '-', ''), 1, 8))
+  );
+
+  ref_code := upper(trim(coalesce(new.raw_user_meta_data->>'referral_code', '')));
+  if ref_code <> '' then
+    select * into referrer from public.profiles where referral_code = ref_code and id <> new.id;
+    if found then
+      update public.profiles set referred_by = ref_code, trial_days = 45 where id = new.id;
+      if referrer.subscribed then
+        update public.profiles
+        set membership_credit_until =
+          (case
+            when referrer.membership_credit_until is not null and referrer.membership_credit_until > now()
+            then referrer.membership_credit_until
+            else now()
+          end) + interval '1 month'
+        where id = referrer.id;
+      end if;
+    end if;
+  end if;
+
   return new;
 end;
 $$ language plpgsql security definer;
