@@ -1,10 +1,19 @@
 import type { ParsedEventDraft } from "./types";
+import { addDaysToYMD, dateComponentsInZone, weekdayOfYMD, zonedTimeToUtc } from "./date";
 
 // 本地启发式自然语言解析器。
 // 这是 AI 功能的「mock 引擎」：无需任何外部服务即可把
 // 「明天下午3点开会」「next monday 10am-11am sync」之类的文本变成事件草稿。
 // 接入真正的 Claude 后（设置了 ANTHROPIC_API_KEY），API 路由会优先调用 Claude，
 // 仅在未配置 key 或调用失败时回退到这里。
+//
+// 时区注意：这个函数可能跑在服务端（Vercel，进程时区固定是 UTC），不能用 Date 的
+// setHours/setDate 这类依赖"进程本地时区"的方法去拼日期——那样拼出来的会是 UTC 时间，
+// 不是调用方真正想要的时区。所以这里全程用 date.ts 里的时区安全工具
+// （dateComponentsInZone / addDaysToYMD / weekdayOfYMD / zonedTimeToUtc）做日历运算，
+// 由调用方显式传入 tz（前端上报浏览器自己的时区）。
+
+type YMD = { y: number; m: number; day: number };
 
 const WEEKDAYS: Record<string, number> = {
   sunday: 0, sun: 0, 周日: 0, 星期日: 0, 礼拜日: 0,
@@ -24,6 +33,21 @@ interface TimePart {
 /** 解析单个时间标记，如 "3pm" "15:00" "10:30am" "下午3点" "上午10点半"。 */
 function parseTime(raw: string): TimePart | null {
   let s = raw.toLowerCase().trim();
+
+  // 带 am/pm 的优先按英文解析——否则下面中文规则里的 "[点:：]" 会把英文冒号也当成
+  // "点" 提前抢先匹配掉（比如 "5:30pm" 被当成"5点30"），白白丢掉 am/pm 信息。
+  if (/am|pm/.test(s)) {
+    const enAmPm = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
+    if (enAmPm) {
+      let hour = parseInt(enAmPm[1], 10);
+      const minute = enAmPm[2] ? parseInt(enAmPm[2], 10) : 0;
+      if (enAmPm[3] === "pm" && hour < 12) hour += 12;
+      if (enAmPm[3] === "am" && hour === 12) hour = 0;
+      if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+        return { hour, minute };
+      }
+    }
+  }
 
   // 中文「下午/晚上/中午」+ 数字点
   const zh = s.match(/(上午|早上|凌晨|下午|晚上|中午)?\s*(\d{1,2})\s*[点:：]\s*(\d{1,2}|半)?/);
@@ -55,22 +79,18 @@ function parseTime(raw: string): TimePart | null {
   return null;
 }
 
-/** 根据文本推断目标日期（只定日期，不含时间）。 */
-function parseDate(text: string, now: Date): { date: Date; matched: string[] } {
+/** 根据文本推断目标日期（只定日历日期，不含时间）。 */
+function parseDate(text: string, base: YMD): { date: YMD; matched: string[] } {
   const lower = text.toLowerCase();
   const matched: string[] = [];
-  const base = new Date(now);
-  base.setHours(0, 0, 0, 0);
 
   if (/明天|tomorrow/.test(lower)) {
     matched.push("tomorrow");
-    base.setDate(base.getDate() + 1);
-    return { date: base, matched };
+    return { date: addDaysToYMD(base.y, base.m, base.day, 1), matched };
   }
   if (/后天/.test(lower)) {
     matched.push("后天");
-    base.setDate(base.getDate() + 2);
-    return { date: base, matched };
+    return { date: addDaysToYMD(base.y, base.m, base.day, 2), matched };
   }
   if (/今天|today|tonight|今晚/.test(lower)) {
     matched.push("today");
@@ -80,8 +100,7 @@ function parseDate(text: string, now: Date): { date: Date; matched: string[] } {
   const inDays = lower.match(/in (\d+) days?/);
   if (inDays) {
     matched.push(inDays[0]);
-    base.setDate(base.getDate() + parseInt(inDays[1], 10));
-    return { date: base, matched };
+    return { date: addDaysToYMD(base.y, base.m, base.day, parseInt(inDays[1], 10)), matched };
   }
 
   // 工作日名称（可带 next / 下）
@@ -89,11 +108,11 @@ function parseDate(text: string, now: Date): { date: Date; matched: string[] } {
     if (lower.includes(word)) {
       matched.push(word);
       const isNext = new RegExp(`(next|下个?周?|下)\\s*${word}`).test(lower);
-      let diff = (dow - base.getDay() + 7) % 7;
+      const todayDow = weekdayOfYMD(base.y, base.m, base.day);
+      let diff = (dow - todayDow + 7) % 7;
       if (diff === 0) diff = 7; // 同名当天默认指下一个
       if (isNext && diff <= 7) diff += diff <= 0 ? 7 : 0;
-      base.setDate(base.getDate() + diff);
-      return { date: base, matched };
+      return { date: addDaysToYMD(base.y, base.m, base.day, diff), matched };
     }
   }
 
@@ -119,9 +138,10 @@ function cleanTitle(text: string): string {
   return t || "New event";
 }
 
-export function mockParseEvent(text: string, nowISO?: string): ParsedEventDraft {
+export function mockParseEvent(text: string, nowISO?: string, tz = "UTC"): ParsedEventDraft {
   const now = nowISO ? new Date(nowISO) : new Date();
-  const { date } = parseDate(text, now);
+  const todayYMD = dateComponentsInZone(now, tz);
+  const { date } = parseDate(text, todayYMD);
 
   // 找出时间标记（可能是一个或两个，构成时间段）
   const timeMatches: TimePart[] = [];
@@ -145,12 +165,13 @@ export function mockParseEvent(text: string, nowISO?: string): ParsedEventDraft 
   let note: string | undefined;
 
   if (timeMatches.length >= 1) {
-    start = new Date(date);
-    start.setHours(timeMatches[0].hour, timeMatches[0].minute, 0, 0);
+    start = zonedTimeToUtc(date.y, date.m, date.day, timeMatches[0].hour, timeMatches[0].minute, tz);
     if (timeMatches.length >= 2) {
-      end = new Date(date);
-      end.setHours(timeMatches[1].hour, timeMatches[1].minute, 0, 0);
-      if (end <= start) end.setDate(end.getDate() + 1);
+      end = zonedTimeToUtc(date.y, date.m, date.day, timeMatches[1].hour, timeMatches[1].minute, tz);
+      if (end <= start) {
+        const next = addDaysToYMD(date.y, date.m, date.day, 1);
+        end = zonedTimeToUtc(next.y, next.m, next.day, timeMatches[1].hour, timeMatches[1].minute, tz);
+      }
       confidence = "high";
     } else {
       end = new Date(start.getTime() + 60 * 60 * 1000);
@@ -159,9 +180,8 @@ export function mockParseEvent(text: string, nowISO?: string): ParsedEventDraft 
     }
   } else {
     // 没有时间 → 全天事件
-    start = new Date(date);
-    end = new Date(date);
-    end.setHours(23, 59, 0, 0);
+    start = zonedTimeToUtc(date.y, date.m, date.day, 0, 0, tz);
+    end = zonedTimeToUtc(date.y, date.m, date.day, 23, 59, tz);
     allDay = true;
     confidence = "low";
     note = "No specific time detected, treating this as an all-day event. ";

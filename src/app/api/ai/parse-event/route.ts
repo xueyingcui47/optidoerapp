@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       // Claude 失败时优雅降级到 mock，绝不中断用户流程（对应 AI 指南 3.1「错误处理与降级」）。
       console.error("[parse-event] Claude failed, falling back to mock:", err);
-      const draft = mockParseEvent(text, nowISO);
+      const draft = mockParseEvent(text, nowISO, tz);
       return NextResponse.json({ draft, engine: "mock", fallback: true });
     }
   }
