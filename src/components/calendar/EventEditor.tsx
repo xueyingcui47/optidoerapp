@@ -187,44 +187,51 @@ export function EventEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start">
-              <input
-                type={draft.allDay ? "date" : "datetime-local"}
-                step={draft.allDay ? undefined : 900}
-                value={
-                  draft.allDay
-                    ? toLocalInputValue(new Date(draft.start)).slice(0, 10)
-                    : toLocalInputValue(new Date(draft.start))
-                }
-                onChange={(e) => {
-                  const newStart = draft.allDay
-                    ? parseLocalDateOnly(e.target.value)
-                    : new Date(e.target.value);
-                  // Changing the start resets the end to match (same day, or +1h if timed) —
-                  // if you want a multi-day span, stretch the end afterward.
-                  const newEnd = draft.allDay
-                    ? new Date(newStart)
-                    : new Date(newStart.getTime() + 60 * 60 * 1000);
-                  set({ start: newStart.toISOString(), end: newEnd.toISOString() });
-                }}
-                className="input"
-              />
+              <div className="space-y-1.5">
+                <input
+                  type="date"
+                  value={toLocalInputValue(new Date(draft.start)).slice(0, 10)}
+                  onChange={(e) => {
+                    const cur = new Date(draft.start);
+                    const newStart = parseLocalDateOnly(e.target.value);
+                    if (!draft.allDay) newStart.setHours(cur.getHours(), cur.getMinutes(), 0, 0);
+                    // Changing the start resets the end to match (same day, or +1h if timed) —
+                    // if you want a multi-day span, stretch the end afterward.
+                    const newEnd = draft.allDay
+                      ? new Date(newStart)
+                      : new Date(newStart.getTime() + 60 * 60 * 1000);
+                    set({ start: newStart.toISOString(), end: newEnd.toISOString() });
+                  }}
+                  className="input"
+                />
+                {!draft.allDay && (
+                  <TimeOfDayPicker
+                    value={new Date(draft.start)}
+                    onChange={(newStart) => {
+                      const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+                      set({ start: newStart.toISOString(), end: newEnd.toISOString() });
+                    }}
+                  />
+                )}
+              </div>
             </Field>
             <Field label="End">
-              <input
-                type={draft.allDay ? "date" : "datetime-local"}
-                step={draft.allDay ? undefined : 900}
-                value={
-                  draft.allDay
-                    ? toLocalInputValue(new Date(draft.end)).slice(0, 10)
-                    : toLocalInputValue(new Date(draft.end))
-                }
-                onChange={(e) =>
-                  set({
-                    end: (draft.allDay ? parseLocalDateOnly(e.target.value) : new Date(e.target.value)).toISOString(),
-                  })
-                }
-                className="input"
-              />
+              <div className="space-y-1.5">
+                <input
+                  type="date"
+                  value={toLocalInputValue(new Date(draft.end)).slice(0, 10)}
+                  onChange={(e) => {
+                    const cur = new Date(draft.end);
+                    const newEnd = parseLocalDateOnly(e.target.value);
+                    if (!draft.allDay) newEnd.setHours(cur.getHours(), cur.getMinutes(), 0, 0);
+                    set({ end: newEnd.toISOString() });
+                  }}
+                  className="input"
+                />
+                {!draft.allDay && (
+                  <TimeOfDayPicker value={new Date(draft.end)} onChange={(newEnd) => set({ end: newEnd.toISOString() })} />
+                )}
+              </div>
               {dateError && <p className="text-xs text-red-600 mt-1">{dateError}</p>}
             </Field>
           </div>
@@ -525,6 +532,75 @@ function Field({
     <div className={align === "right" ? "flex flex-col items-end" : undefined}>
       <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function hour24To12(h: number): { h12: number; ampm: "AM" | "PM" } {
+  const ampm = h >= 12 ? "PM" : "AM";
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return { h12, ampm };
+}
+
+function hour12To24(h12: number, ampm: "AM" | "PM"): number {
+  const h = h12 % 12;
+  return ampm === "PM" ? h + 12 : h;
+}
+
+const HOURS_1_TO_12 = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINUTES_0_TO_59 = Array.from({ length: 60 }, (_, i) => i);
+
+// 时间选择用普通 <select> 而不是原生 time/datetime-local 那种滚轮控件——下拉列表天生
+// 到了第一项/最后一项就停住，不会像滚轮一样从 12 转回 1、从 59 转回 0。
+function TimeOfDayPicker({ value, onChange }: { value: Date; onChange: (next: Date) => void }) {
+  const { h12, ampm } = hour24To12(value.getHours());
+  const minute = value.getMinutes();
+
+  const apply = (patch: { h12?: number; minute?: number; ampm?: "AM" | "PM" }) => {
+    const next = new Date(value);
+    next.setHours(
+      hour12To24(patch.h12 ?? h12, patch.ampm ?? ampm),
+      patch.minute ?? minute,
+      0,
+      0
+    );
+    onChange(next);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value={h12}
+        onChange={(e) => apply({ h12: Number(e.target.value) })}
+        className="input px-1.5 min-w-0 flex-1"
+      >
+        {HOURS_1_TO_12.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <span className="text-slate-400">:</span>
+      <select
+        value={minute}
+        onChange={(e) => apply({ minute: Number(e.target.value) })}
+        className="input px-1.5 min-w-0 flex-1"
+      >
+        {MINUTES_0_TO_59.map((m) => (
+          <option key={m} value={m}>
+            {String(m).padStart(2, "0")}
+          </option>
+        ))}
+      </select>
+      <select
+        value={ampm}
+        onChange={(e) => apply({ ampm: e.target.value as "AM" | "PM" })}
+        className="input px-1.5 min-w-0 flex-1"
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
     </div>
   );
 }
