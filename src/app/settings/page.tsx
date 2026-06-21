@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { fmtDateTime } from "@/lib/date";
-import { FIRST_MONTH_PROMO_PRICE, PRICING } from "@/components/Paywall";
+import { FIRST_MONTH_PROMO_PRICE, PRICING, PlanCard } from "@/components/Paywall";
 import { supabaseEnabled } from "@/lib/supabaseClient";
 
 export default function SettingsPage() {
@@ -64,21 +64,11 @@ export default function SettingsPage() {
             </button>
           </div>
         ) : (
-          <div className="py-3 space-y-2">
+          <div className="py-3 space-y-3">
             <div className="text-xs text-slate-500">Subscribe anytime — no need to wait for your trial to end.</div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => subscribe("tier1", "monthly")} className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100">
-                {PRICING.tier1.label} — ${PRICING.tier1.monthly}/mo
-              </button>
-              <button onClick={() => subscribe("tier1", "yearly")} className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100">
-                {PRICING.tier1.label} — ${PRICING.tier1.yearly}/yr
-              </button>
-              <button onClick={() => subscribe("tier2", "monthly")} className="text-sm rounded-lg bg-brand-600 text-white px-3 py-1.5 hover:bg-brand-700">
-                {PRICING.tier2.label} — ${PRICING.tier2.monthly}/mo
-              </button>
-              <button onClick={() => subscribe("tier2", "yearly")} className="text-sm rounded-lg bg-brand-600 text-white px-3 py-1.5 hover:bg-brand-700">
-                {PRICING.tier2.label} — ${PRICING.tier2.yearly}/yr
-              </button>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <PlanCard tier="tier1" onSubscribe={subscribe} />
+              <PlanCard tier="tier2" highlight onSubscribe={subscribe} />
             </div>
             <Toggle
               label="(Dev) Simulate trial expiration → trigger hard paywall"
