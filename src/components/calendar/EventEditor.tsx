@@ -33,6 +33,8 @@ export function EventEditor({
   const [customDaysInput, setCustomDaysInput] = useState(String(initial.customIntervalDays ?? 1));
   const [occurrencesInput, setOccurrencesInput] = useState(String(initial.recurrenceOccurrences ?? 5));
   const endless = draft.recurrenceOccurrences == null;
+  // 试用期间给全功能（含 AI）；订阅后只有 AI 档（tier2）才能用自然语言建事件。
+  const aiAllowed = !state.account?.subscribed || state.account.plan === "tier2";
   const [showDeleteChoice, setShowDeleteChoice] = useState(false);
   const dateError =
     new Date(draft.end) < new Date(draft.start) ? "End must be on or after the start." : null;
@@ -118,8 +120,9 @@ export function EventEditor({
         </div>
 
         <div className="p-5 space-y-4">
-          {/* AI natural-language creation (flagship feature) */}
-          {state.settings.aiNlEventEnabled && (
+          {/* AI natural-language creation (flagship feature) — full access during trial,
+              AI Plan only once subscribed. */}
+          {state.settings.aiNlEventEnabled && aiAllowed && (
             <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3">
               <div className="text-sm font-medium text-brand-800 mb-2">
                 ✨ Create with natural language
@@ -142,6 +145,16 @@ export function EventEditor({
                 {aiMsg && <span className="text-xs text-slate-600">{aiMsg}</span>}
                 {aiError && <span className="text-xs text-red-600">{aiError}</span>}
               </div>
+            </div>
+          )}
+          {state.settings.aiNlEventEnabled && !aiAllowed && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
+              <div className="text-sm text-slate-600">
+                ✨ <strong>Create with natural language</strong> is an AI Plan feature.
+              </div>
+              <a href="/settings" className="text-sm text-brand-600 font-medium hover:underline whitespace-nowrap">
+                Upgrade
+              </a>
             </div>
           )}
 

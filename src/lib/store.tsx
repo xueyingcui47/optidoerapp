@@ -112,6 +112,7 @@ interface StoreApi {
   createAccount: (name: string, email: string) => void;
   resetAccount: () => void;
   subscribe: (plan: "tier1" | "tier2", billing: "monthly" | "yearly") => void;
+  cancelSubscription: () => void;
   trialLeft: number;
   locked: boolean; // 试用到期且未订阅 → 硬付费墙
 
@@ -351,6 +352,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             .update({ subscribed: true, plan, billing, subscribed_at: subscribedAt })
             .eq("id", userId)
             .then(({ error }) => error && console.error("subscribe sync failed", error));
+        }
+      },
+
+      cancelSubscription: () => {
+        setState((s) => ({
+          ...s,
+          account: s.account
+            ? { ...s.account, subscribed: false, plan: null, billing: null, subscribedAt: null }
+            : s.account,
+        }));
+        if (supabaseEnabled && supabase && userId) {
+          supabase
+            .from("profiles")
+            .update({ subscribed: false, plan: null, billing: null, subscribed_at: null })
+            .eq("id", userId)
+            .then(({ error }) => error && console.error("cancelSubscription sync failed", error));
         }
       },
 

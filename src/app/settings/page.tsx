@@ -6,7 +6,7 @@ import { FIRST_MONTH_PROMO_PRICE, PRICING } from "@/components/Paywall";
 import { supabaseEnabled } from "@/lib/supabaseClient";
 
 export default function SettingsPage() {
-  const { state, updateSettings, clearAiLog, resetAccount, trialLeft } = useStore();
+  const { state, updateSettings, clearAiLog, resetAccount, trialLeft, subscribe, cancelSubscription } = useStore();
   const s = state.settings;
   const account = state.account;
   const inFirstMonth =
@@ -36,12 +36,56 @@ export default function SettingsPage() {
               : `Trial · ${trialLeft} day${trialLeft === 1 ? "" : "s"} left`
           }
         />
-        {!state.account?.subscribed && (
-          <Toggle
-            label="(Dev) Simulate trial expiration → trigger hard paywall"
-            checked={s.simulateTrialExpired}
-            onChange={(v) => updateSettings({ simulateTrialExpired: v })}
-          />
+        {account?.subscribed ? (
+          <div className="py-3 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => subscribe(account.plan === "tier2" ? "tier1" : "tier2", account.billing ?? "monthly")}
+                className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+              >
+                Switch to {account.plan === "tier2" ? PRICING.tier1.label : PRICING.tier2.label}
+              </button>
+              <button
+                onClick={() => subscribe(account.plan ?? "tier1", account.billing === "yearly" ? "monthly" : "yearly")}
+                className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100"
+              >
+                Switch to {account.billing === "yearly" ? "monthly" : "yearly"} billing
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm("Cancel your subscription? You'll lose access to paid features immediately.")) {
+                  cancelSubscription();
+                }
+              }}
+              className="text-sm text-red-600 hover:underline"
+            >
+              Cancel subscription
+            </button>
+          </div>
+        ) : (
+          <div className="py-3 space-y-2">
+            <div className="text-xs text-slate-500">Subscribe anytime — no need to wait for your trial to end.</div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => subscribe("tier1", "monthly")} className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100">
+                {PRICING.tier1.label} — ${PRICING.tier1.monthly}/mo
+              </button>
+              <button onClick={() => subscribe("tier1", "yearly")} className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-100">
+                {PRICING.tier1.label} — ${PRICING.tier1.yearly}/yr
+              </button>
+              <button onClick={() => subscribe("tier2", "monthly")} className="text-sm rounded-lg bg-brand-600 text-white px-3 py-1.5 hover:bg-brand-700">
+                {PRICING.tier2.label} — ${PRICING.tier2.monthly}/mo
+              </button>
+              <button onClick={() => subscribe("tier2", "yearly")} className="text-sm rounded-lg bg-brand-600 text-white px-3 py-1.5 hover:bg-brand-700">
+                {PRICING.tier2.label} — ${PRICING.tier2.yearly}/yr
+              </button>
+            </div>
+            <Toggle
+              label="(Dev) Simulate trial expiration → trigger hard paywall"
+              checked={s.simulateTrialExpired}
+              onChange={(v) => updateSettings({ simulateTrialExpired: v })}
+            />
+          </div>
         )}
       </Section>
 
