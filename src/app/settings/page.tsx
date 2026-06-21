@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { fmtDateTime } from "@/lib/date";
-import { FIRST_MONTH_PROMO_PRICE, PRICING, PlanCard } from "@/components/Paywall";
+import { PRICING, PlanCard } from "@/components/Paywall";
 import { supabaseEnabled } from "@/lib/supabaseClient";
 
 export default function SettingsPage() {
@@ -30,7 +30,7 @@ export default function SettingsPage() {
                   account.billing === "yearly"
                     ? `Yearly $${PRICING[account.plan ?? "tier1"].yearly}/yr`
                     : inFirstMonth
-                    ? `Monthly (first month $${FIRST_MONTH_PROMO_PRICE.toFixed(2)}, then $${PRICING[account.plan ?? "tier1"].monthly}/mo)`
+                    ? `Monthly (first month free, then $${PRICING[account.plan ?? "tier1"].monthly}/mo)`
                     : `Monthly $${PRICING[account.plan ?? "tier1"].monthly}/mo`
                 }`
               : `Trial · ${trialLeft} day${trialLeft === 1 ? "" : "s"} left`

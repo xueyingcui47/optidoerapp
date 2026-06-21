@@ -6,8 +6,8 @@ import { useStore } from "@/lib/store";
 // Hard paywall (SOW 4.5): locks core features once the trial ends without a subscription,
 // keeping only "view + subscribe" access so data is never held hostage.
 
-// First-month promo price for monthly billing (reverts to the normal monthly price after).
-export const FIRST_MONTH_PROMO_PRICE = 0.01;
+// First-month promo for monthly billing (reverts to the normal monthly price after).
+export const FIRST_MONTH_PROMO_PRICE = 0;
 
 export const PRICING = {
   tier1: { label: "Standard Membership", monthly: 2.99, yearly: 29.99 },
@@ -73,10 +73,14 @@ export function PlanCard({
       </div>
 
       <div className="mt-3">
-        <span className="text-3xl font-bold">
-          ${billing === "monthly" ? FIRST_MONTH_PROMO_PRICE.toFixed(2) : price}
-        </span>
-        <span className="text-slate-500 text-sm">/{billing === "monthly" ? "first month" : "year"}</span>
+        {billing === "monthly" ? (
+          <span className="text-3xl font-bold">First Month Free</span>
+        ) : (
+          <>
+            <span className="text-3xl font-bold">${price}</span>
+            <span className="text-slate-500 text-sm">/year</span>
+          </>
+        )}
       </div>
       {billing === "monthly" && <div className="text-xs text-slate-400 mt-0.5">${price}/mo after that</div>}
       {billing === "yearly" && (
