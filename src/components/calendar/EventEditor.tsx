@@ -108,8 +108,13 @@ export function EventEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+    // 点对话框外面的半透明背景 = 自动保存并关闭（跟点 Save 按钮是同一个动作），
+    // 不用每次都先点 Save 再关。inner box 上的 stopPropagation 防止点对话框内部时误触发。
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={save}>
+      <div
+        className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
           <h2 className="font-semibold text-slate-800">
             {editingId ? "Edit event" : "New event"}
@@ -132,7 +137,7 @@ export function EventEditor({
                 onChange={(e) => setNl(e.target.value)}
                 placeholder="e.g. lunch with Sam tomorrow at noon / next monday 10am-11am sync"
                 rows={2}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-400"
               />
               <div className="flex items-center gap-2 mt-2">
                 <button
@@ -493,12 +498,16 @@ export function EventEditor({
       )}
 
       <style jsx>{`
+        /* font-size 必须 ≥16px——手机浏览器（尤其 iOS WebKit，包括手机上的 Chrome，因为
+           iOS 上所有浏览器底层都是 WebKit）对小于 16px 的输入框会在聚焦时自动放大整页面，
+           松手后页面停留在放大状态，于是又能左右晃/滑了。之前这里是 0.875rem(14px)，
+           正好踩中这个坑。 */
         :global(.input) {
           width: 100%;
           border: 1px solid rgb(203 213 225);
           border-radius: 0.5rem;
           padding: 0.4rem 0.6rem;
-          font-size: 0.875rem;
+          font-size: 16px;
         }
         :global(.input:focus) {
           outline: none;
@@ -508,7 +517,7 @@ export function EventEditor({
           border: 1px solid rgb(203 213 225);
           border-radius: 0.5rem;
           padding: 0.4rem 0.6rem;
-          font-size: 0.875rem;
+          font-size: 16px;
         }
         :global(.input-sm:focus) {
           outline: none;
