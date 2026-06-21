@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { noteSnippet } from "@/lib/reminders";
@@ -8,9 +9,16 @@ import { toLocalInputValue } from "@/lib/date";
 
 export default function NotesPage() {
   const { state, addNote, updateNote, deleteNote } = useStore();
+  const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+
+  // 从别的页面（Today/Reminders）点一条笔记跳过来时，用 ?note=<id> 直接打开它。
+  useEffect(() => {
+    const noteId = searchParams.get("note");
+    if (noteId) setSelectedId(noteId);
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();

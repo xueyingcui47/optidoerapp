@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { eventsOnDay, upcomingReminders } from "@/lib/reminders";
 import { fmtDate, fmtTime, fmtDateTime, startOfDay, addDays } from "@/lib/date";
-import { expandEventsInRange } from "@/lib/recurrence";
+import { baseEventId, expandEventsInRange } from "@/lib/recurrence";
 
 export default function TodayPage() {
   const { state } = useStore();
@@ -38,16 +38,21 @@ export default function TodayPage() {
         ) : (
           <ul className="space-y-2">
             {todayEvents.map((ev) => (
-              <li key={ev.id} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-500 w-28 shrink-0">
-                  {ev.allDay ? "All day" : `${fmtTime(new Date(ev.start))}`}
-                </span>
-                <span className="font-medium text-slate-800">{ev.title}</span>
-                {ev.source === "ai" && (
-                  <span className="text-xs rounded bg-brand-50 text-brand-600 px-1.5 py-0.5">
-                    AI
+              <li key={ev.id}>
+                <Link
+                  href={`/calendar?event=${baseEventId(ev.id)}`}
+                  className="flex items-center gap-3 text-sm hover:bg-slate-50 rounded px-1 py-0.5 -mx-1"
+                >
+                  <span className="text-slate-500 w-28 shrink-0">
+                    {ev.allDay ? "All day" : `${fmtTime(new Date(ev.start))}`}
                   </span>
-                )}
+                  <span className="font-medium text-slate-800">{ev.title}</span>
+                  {ev.source === "ai" && (
+                    <span className="text-xs rounded bg-brand-50 text-brand-600 px-1.5 py-0.5">
+                      AI
+                    </span>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>
@@ -68,10 +73,15 @@ export default function TodayPage() {
             <ul className="space-y-2">
               {reminders.map((r) => (
                 <li key={r.id} className="text-sm">
-                  <div className="font-medium text-slate-800">{r.title}</div>
-                  <div className="text-slate-500">
-                    {fmtDateTime(r.at)} · {r.offsetLabel}
-                  </div>
+                  <Link
+                    href={r.kind === "event" ? `/calendar?event=${r.sourceId}` : `/notes?note=${r.sourceId}`}
+                    className="block hover:bg-slate-50 rounded px-1 py-0.5 -mx-1"
+                  >
+                    <div className="font-medium text-slate-800">{r.title}</div>
+                    <div className="text-slate-500">
+                      {fmtDateTime(r.at)} · {r.offsetLabel}
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -91,7 +101,7 @@ export default function TodayPage() {
             <ul className="space-y-2">
               {recentNotes.map((n) => (
                 <li key={n.id} className="text-sm">
-                  <Link href="/notes" className="font-medium text-slate-800 hover:text-brand-600">
+                  <Link href={`/notes?note=${n.id}`} className="font-medium text-slate-800 hover:text-brand-600">
                     {n.title || "(untitled)"}
                   </Link>
                 </li>

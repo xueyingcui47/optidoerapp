@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { EventEditor } from "@/components/calendar/EventEditor";
 import { eventsOnDay } from "@/lib/reminders";
@@ -44,9 +45,21 @@ function newDraft(start: Date): Draft {
 
 export default function CalendarPage() {
   const { state } = useStore();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(new Date());
   const [editor, setEditor] = useState<{ initial: Draft; id: string | null; occurrenceIndex: number } | null>(null);
+
+  // 从别的页面（Today/Reminders）点一个事件跳过来时，用 ?event=<id> 直接打开它的编辑框。
+  useEffect(() => {
+    const eventId = searchParams.get("event");
+    if (!eventId) return;
+    const ev = state.events.find((e) => e.id === eventId);
+    if (ev) {
+      setCursor(new Date(ev.start));
+      setEditor({ initial: { ...ev }, id: ev.id, occurrenceIndex: 0 });
+    }
+  }, [searchParams, state.events]);
 
   const openNew = (start: Date) => setEditor({ initial: newDraft(start), id: null, occurrenceIndex: 0 });
   const openEdit = (ev: CalendarEvent) => {

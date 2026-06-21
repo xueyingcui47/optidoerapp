@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { upcomingReminders } from "@/lib/reminders";
 import { fmtDateTime } from "@/lib/date";
@@ -51,25 +52,27 @@ export default function RemindersPage() {
       ) : (
         <ul className="space-y-2">
           {reminders.map((r) => (
-            <li
-              key={r.id}
-              className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between"
-            >
-              <div>
-                <div className="font-medium text-slate-800">{r.title}</div>
-                <div className="text-sm text-slate-500">
-                  {fmtDateTime(r.at)} · {r.offsetLabel}
-                </div>
-              </div>
-              <span
-                className={`text-xs rounded px-2 py-0.5 ${
-                  r.kind === "event"
-                    ? "bg-brand-100 text-brand-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
+            <li key={r.id}>
+              <Link
+                href={r.kind === "event" ? `/calendar?event=${r.sourceId}` : `/notes?note=${r.sourceId}`}
+                className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between hover:border-brand-300 hover:bg-brand-50/30 transition"
               >
-                {r.kind === "event" ? "Event" : "Note"}
-              </span>
+                <div>
+                  <div className="font-medium text-slate-800">{r.title}</div>
+                  <div className="text-sm text-slate-500">
+                    {fmtDateTime(r.at)} · {r.offsetLabel}
+                  </div>
+                </div>
+                <span
+                  className={`text-xs rounded px-2 py-0.5 ${
+                    r.kind === "event"
+                      ? "bg-brand-100 text-brand-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {r.kind === "event" ? "Event" : "Note"}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>

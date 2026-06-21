@@ -1,5 +1,5 @@
 import type { AppState, CalendarEvent, Note } from "./types";
-import { expandEventsInRange } from "./recurrence";
+import { baseEventId, expandEventsInRange } from "./recurrence";
 
 export interface ReminderInstance {
   id: string;
@@ -33,7 +33,7 @@ export function upcomingReminders(state: AppState, horizonDays = 30): ReminderIn
           kind: "event",
           offsetLabel:
             offset === 0 ? "At start time" : `${offset >= 60 ? offset / 60 + " hr" : offset + " min"} before`,
-          sourceId: ev.id,
+          sourceId: baseEventId(ev.id),
         });
       }
     }
