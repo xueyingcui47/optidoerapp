@@ -16,7 +16,7 @@ import type {
   CalendarEvent,
   Note,
 } from "./types";
-import { trialDaysLeft } from "./date";
+import { nextAnniversary, trialDaysLeft } from "./date";
 import { supabase, supabaseEnabled } from "./supabaseClient";
 import { fromDbEvent, fromDbNote, fromDbProfile, toDbEvent, toDbNote } from "./db";
 
@@ -111,7 +111,9 @@ interface StoreApi {
   // 账号 / 试用 / 订阅
   createAccount: (name: string, email: string) => void;
   resetAccount: () => void;
+  // 年费 → 月付是"预约"而不是立即生效，见 pendingBilling/pendingBillingEffectiveAt 字段。
   subscribe: (plan: "tier1" | "tier2", billing: "monthly" | "yearly") => void;
+  cancelPendingBillingChange: () => void;
   cancelSubscription: () => void;
   trialLeft: number;
   locked: boolean; // 试用到期且未订阅 → 硬付费墙
@@ -245,6 +247,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
+  // 结算"预约切月付"：每次账号数据变化时检查一下，到期日一过就真正把 billing 切成
+  // monthly（同时把账单周期起点重置到这一天），不需要专门的后台定时任务。
+  useEffect(() => {
+    const account = state.account;
+    if (!account?.pendingBilling || !account.pendingBillingEffectiveAt) return;
+    if (new Date(account.pendingBillingEffectiveAt) > new Date()) return;
+    const newSubscribedAt = account.pendingBillingEffectiveAt;
+    setState((s) =>
+      s.account?.pendingBilling
+        ? {
+            ...s,
+            account: {
+              ...s.account,
+              billing: "monthly",
+              subscribedAt: newSubscribedAt,
+              pendingBilling: null,
+              pendingBillingEffectiveAt: null,
+            },
+          }
+        : s
+    );
+    if (supabaseEnabled && supabase && userId) {
+      supabase
+        .from("profiles")
+        .update({
+          billing: "monthly",
+          subscribed_at: newSubscribedAt,
+          pending_billing: null,
+          pending_billing_effective_at: null,
+        })
+        .eq("id", userId)
+        .then(({ error }) => error && console.error("settle pendingBilling sync failed", error));
+    }
+  }, [state.account, userId]);
+
   const api = useMemo<StoreApi>(() => {
     const trialLeft = state.account
       ? state.account.subscribed
@@ -282,6 +319,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             plan: null,
             billing: null,
             subscribedAt: null,
+            pendingBilling: null,
+            pendingBillingEffectiveAt: null,
             referralCode: "",
             referredBy: null,
             trialDays: 15,
@@ -346,18 +385,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       subscribe: (plan, billing) => {
+        const current = state.account;
+        // 年费用户想切月付：不立即生效，预约到当前已付的这一年到期那天才真正切换
+        // （避免刚付了年费优惠价就能立刻退回月付的怪异体验）。月付随时可以立即切年付。
+        const isYearlyToMonthlyDowngrade =
+          !!current?.subscribed && current.billing === "yearly" && billing === "monthly";
+
+        if (isYearlyToMonthlyDowngrade && current?.subscribedAt) {
+          const effectiveAt = nextAnniversary(new Date(current.subscribedAt), new Date()).toISOString();
+          setState((s) => ({
+            ...s,
+            account: s.account ? { ...s.account, plan, pendingBilling: "monthly", pendingBillingEffectiveAt: effectiveAt } : s.account,
+          }));
+          if (supabaseEnabled && supabase && userId) {
+            supabase
+              .from("profiles")
+              .update({ plan, pending_billing: "monthly", pending_billing_effective_at: effectiveAt })
+              .eq("id", userId)
+              .then(({ error }) => error && console.error("subscribe (schedule downgrade) sync failed", error));
+          }
+          return;
+        }
+
         const subscribedAt = nowISO();
         setState((s) => ({
           ...s,
-          account: s.account ? { ...s.account, subscribed: true, plan, billing, subscribedAt } : s.account,
+          account: s.account
+            ? { ...s.account, subscribed: true, plan, billing, subscribedAt, pendingBilling: null, pendingBillingEffectiveAt: null }
+            : s.account,
           settings: { ...s.settings, simulateTrialExpired: false },
         }));
         if (supabaseEnabled && supabase && userId) {
           supabase
             .from("profiles")
-            .update({ subscribed: true, plan, billing, subscribed_at: subscribedAt })
+            .update({
+              subscribed: true,
+              plan,
+              billing,
+              subscribed_at: subscribedAt,
+              pending_billing: null,
+              pending_billing_effective_at: null,
+            })
             .eq("id", userId)
             .then(({ error }) => error && console.error("subscribe sync failed", error));
+        }
+      },
+
+      cancelPendingBillingChange: () => {
+        setState((s) => ({
+          ...s,
+          account: s.account ? { ...s.account, pendingBilling: null, pendingBillingEffectiveAt: null } : s.account,
+        }));
+        if (supabaseEnabled && supabase && userId) {
+          supabase
+            .from("profiles")
+            .update({ pending_billing: null, pending_billing_effective_at: null })
+            .eq("id", userId)
+            .then(({ error }) => error && console.error("cancelPendingBillingChange sync failed", error));
         }
       },
 
@@ -365,13 +449,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((s) => ({
           ...s,
           account: s.account
-            ? { ...s.account, subscribed: false, plan: null, billing: null, subscribedAt: null }
+            ? {
+                ...s.account,
+                subscribed: false,
+                plan: null,
+                billing: null,
+                subscribedAt: null,
+                pendingBilling: null,
+                pendingBillingEffectiveAt: null,
+              }
             : s.account,
         }));
         if (supabaseEnabled && supabase && userId) {
           supabase
             .from("profiles")
-            .update({ subscribed: false, plan: null, billing: null, subscribed_at: null })
+            .update({
+              subscribed: false,
+              plan: null,
+              billing: null,
+              subscribed_at: null,
+              pending_billing: null,
+              pending_billing_effective_at: null,
+            })
             .eq("id", userId)
             .then(({ error }) => error && console.error("cancelSubscription sync failed", error));
         }

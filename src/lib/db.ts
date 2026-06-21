@@ -11,6 +11,8 @@ export function fromDbProfile(row: any): Account {
     plan: row.plan ?? null,
     billing: row.billing ?? null,
     subscribedAt: row.subscribed_at ?? null,
+    pendingBilling: row.pending_billing ?? null,
+    pendingBillingEffectiveAt: row.pending_billing_effective_at ?? null,
     referralCode: row.referral_code ?? "",
     referredBy: row.referred_by ?? null,
     trialDays: row.trial_days ?? 15,

@@ -21,6 +21,15 @@ export function addMonths(d: Date, n: number): Date {
   return r;
 }
 
+/** 从 start 起算，下一个严格晚于 now 的"周年纪念日"——用来算年费下一次续费/到期日。 */
+export function nextAnniversary(start: Date, now: Date): Date {
+  const r = new Date(start);
+  while (r <= now) {
+    r.setFullYear(r.getFullYear() + 1);
+  }
+  return r;
+}
+
 /** 周一作为一周起点。 */
 export function startOfWeek(d: Date): Date {
   const r = startOfDay(d);

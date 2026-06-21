@@ -58,8 +58,13 @@ export interface Account {
   subscribed: boolean;
   plan: "tier1" | "tier2" | null;
   billing: "monthly" | "yearly" | null;
-  /** 订阅生效时间，用于判断是否仍在首月优惠期（月付首月 $0.01）。 */
+  /** 订阅生效时间，用于判断是否仍在首月优惠期，也是年费账单周期的起算点。 */
   subscribedAt: string | null;
+  /** 年费用户预约"切到月付"——不立即生效，等当前已付的这一年到期那天才真正切换，
+   *  避免"刚付了年费优惠价就能立刻退回月付"的奇怪体验。月付随时可以立即切年付，不用预约。 */
+  pendingBilling: "monthly" | null;
+  /** pendingBilling 生效的日期（当前年费周期的到期日）。 */
+  pendingBillingEffectiveAt: string | null;
   /** 这个账号自己的邀请码，注册时数据库自动生成。 */
   referralCode: string;
   /** 注册时用了谁的邀请码（一次性，没有就是 null）。 */

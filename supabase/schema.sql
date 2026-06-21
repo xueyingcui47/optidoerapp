@@ -11,6 +11,9 @@ create table if not exists public.profiles (
   plan text check (plan in ('tier1', 'tier2')),
   billing text check (billing in ('monthly', 'yearly')),
   subscribed_at timestamptz,
+  -- 年费用户预约"切到月付"——不立即生效，等当前已付的这一年到期那天才真正切换。
+  pending_billing text check (pending_billing in ('monthly')),
+  pending_billing_effective_at timestamptz,
   -- 邀请功能：referral_code 是这个用户自己的邀请码（注册时自动生成）；referred_by 记录
   -- 这个用户注册时用了谁的邀请码（一次性，用过就不能再用别的码）；trial_days 默认 15，
   -- 被邀请注册成功后改成 45；membership_credit_until 是邀请人攒到的"会员有效期延长"——
