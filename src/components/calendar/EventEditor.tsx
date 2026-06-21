@@ -109,7 +109,7 @@ export function EventEditor({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-auto">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
           <h2 className="font-semibold text-slate-800">
             {editingId ? "Edit event" : "New event"}
