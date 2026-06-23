@@ -44,7 +44,7 @@ function newDraft(start: Date): Draft {
 }
 
 export default function CalendarPage() {
-  const { state } = useStore();
+  const { state, updateEvent } = useStore();
   const searchParams = useSearchParams();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(new Date());
@@ -156,6 +156,7 @@ export default function CalendarPage() {
             events={visibleEvents}
             onDayClick={openNew}
             onEventClick={openEdit}
+            onEventMove={updateEvent}
           />
         )}
         {view === "week" && (
@@ -218,17 +219,39 @@ function MonthGrid({
   events,
   onDayClick,
   onEventClick,
+  onEventMove,
 }: {
   cursor: Date;
   events: CalendarEvent[];
   onDayClick: (d: Date) => void;
   onEventClick: (e: CalendarEvent) => void;
+  onEventMove: (id: string, patch: Partial<CalendarEvent>) => void;
 }) {
   const cells = useMemo(() => {
     const first = startOfMonth(cursor);
     const gridStart = startOfWeek(first);
     return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   }, [cursor]);
+
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  // 拖到新的一天：日期换成目标日，时间（如果不是全天事件）原样保留，时长也保持不变。
+  // 只对非循环事件开放拖拽——循环事件的"某一次"目前没有单独改日期的数据结构，
+  // 直接拖会牵动整个系列，容易让人意外，所以先不让它能拖（点开还是能正常编辑）。
+  const handleDrop = (e: React.DragEvent, day: Date) => {
+    e.preventDefault();
+    setDragOver(null);
+    const id = e.dataTransfer.getData("text/plain");
+    if (!id) return;
+    const ev = events.find((x) => x.id === id);
+    if (!ev) return;
+    const oldStart = new Date(ev.start);
+    const duration = new Date(ev.end).getTime() - oldStart.getTime();
+    const newStart = new Date(day);
+    newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), oldStart.getSeconds(), 0);
+    const newEnd = new Date(newStart.getTime() + duration);
+    onEventMove(id, { start: newStart.toISOString(), end: newEnd.toISOString() });
+  };
 
   return (
     <div className="grid grid-cols-7 border-l border-t border-slate-200 bg-white">
@@ -247,9 +270,13 @@ function MonthGrid({
           <div
             key={i}
             onClick={() => onDayClick(day)}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={() => setDragOver(i)}
+            onDragLeave={() => setDragOver((cur) => (cur === i ? null : cur))}
+            onDrop={(e) => handleDrop(e, day)}
             className={`min-h-[64px] sm:min-h-[96px] border-r border-b border-slate-200 p-0.5 sm:p-1 cursor-pointer hover:bg-slate-50 ${
               inMonth ? "" : "bg-slate-50/60"
-            }`}
+            } ${dragOver === i ? "bg-brand-50 ring-2 ring-inset ring-brand-300" : ""}`}
           >
             <div
               className={`text-xs mb-1 inline-flex items-center justify-center w-6 h-6 rounded-full ${
@@ -266,11 +293,19 @@ function MonthGrid({
               {dayEvents.slice(0, 3).map((ev) => (
                 <button
                   key={ev.id}
+                  draggable={ev.recurrence === "none"}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    e.dataTransfer.setData("text/plain", ev.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onEventClick(ev);
                   }}
-                  className={`block w-full text-left truncate text-[11px] rounded px-1 py-0.5 ${eventPillClasses(ev)}`}
+                  className={`block w-full text-left truncate text-[11px] rounded px-1 py-0.5 ${eventPillClasses(ev)} ${
+                    ev.recurrence === "none" ? "cursor-grab active:cursor-grabbing" : ""
+                  }`}
                 >
                   {!ev.allDay && <span className="opacity-70 mr-1">{fmtTime(new Date(ev.start))}</span>}
                   {ev.title || "(untitled)"}
