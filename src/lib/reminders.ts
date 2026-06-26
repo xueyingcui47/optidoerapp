@@ -21,9 +21,13 @@ export function upcomingReminders(state: AppState, horizonDays = 30): ReminderIn
   const expandEnd = new Date(horizon.getTime() + 86_400_000);
   const expandedEvents = expandEventsInRange(state.events, now, expandEnd);
 
-  for (const ev of expandedEvents) {
-    const start = new Date(ev.start);
-    for (const offset of ev.reminders) {
+  // 事件提醒现在是 Settings 里的一个全局设置（defaultReminderOffset），不再是每个事件
+  // 自己单独选——所有事件统一用这一个提前量，改了 Settings 立刻对所有事件生效。
+  // -1 表示关闭事件提醒。
+  const offset = state.settings.defaultReminderOffset;
+  if (offset >= 0) {
+    for (const ev of expandedEvents) {
+      const start = new Date(ev.start);
       const at = new Date(start.getTime() - offset * 60_000);
       if (at >= now && at <= horizon) {
         out.push({

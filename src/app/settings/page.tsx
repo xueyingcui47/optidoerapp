@@ -232,18 +232,20 @@ export default function SettingsPage() {
           onChange={(v) => updateSettings({ channels: { ...s.channels, email: v } })}
         />
         <div className="flex items-center justify-between py-2">
-          <span className="text-sm text-slate-700">Default event reminder</span>
+          <span className="text-sm text-slate-700">Event reminder</span>
           <select
             value={s.defaultReminderOffset}
             onChange={(e) => updateSettings({ defaultReminderOffset: parseInt(e.target.value, 10) })}
             className="border border-slate-300 rounded px-2 py-1 text-sm"
           >
+            <option value={-1}>None</option>
             <option value={0}>At start time</option>
             <option value={10}>10 minutes before</option>
             <option value={60}>1 hour before</option>
             <option value={1440}>1 day before</option>
           </select>
         </div>
+        <p className="text-xs text-slate-400 -mt-1 pb-1">Applies to all events — there's no longer a per-event override.</p>
       </Section>
 
       <Section title="Danger zone">

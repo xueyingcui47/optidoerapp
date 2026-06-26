@@ -9,13 +9,6 @@ import type { CalendarEvent, RecurrenceFreq } from "@/lib/types";
 
 type Draft = Omit<CalendarEvent, "id" | "createdAt" | "updatedAt">;
 
-const REMINDER_OPTIONS = [
-  { v: 0, label: "At start time" },
-  { v: 10, label: "10 minutes before" },
-  { v: 60, label: "1 hour before" },
-  { v: 1440, label: "1 day before" },
-];
-
 export function EventEditor({
   initial,
   editingId,
@@ -107,10 +100,18 @@ export function EventEditor({
     onClose();
   };
 
+  // 点对话框外面：标题是空的就没必要保存一个空事件，直接关掉/放弃这次编辑就好。
+  const handleBackdropClick = () => {
+    if (!draft.title.trim()) {
+      onClose();
+      return;
+    }
+    save();
+  };
+
   return (
-    // 点对话框外面的半透明背景 = 自动保存并关闭（跟点 Save 按钮是同一个动作），
-    // 不用每次都先点 Save 再关。inner box 上的 stopPropagation 防止点对话框内部时误触发。
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={save}>
+    // inner box 上的 stopPropagation 防止点对话框内部时误触发外层这个保存动作。
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={handleBackdropClick}>
       <div
         className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -241,14 +242,6 @@ export function EventEditor({
             </Field>
           </div>
 
-          <Field label="Location">
-            <input
-              value={draft.location}
-              onChange={(e) => set({ location: e.target.value })}
-              className="input"
-            />
-          </Field>
-
           <Field label="Notes">
             <textarea
               value={draft.description}
@@ -276,106 +269,88 @@ export function EventEditor({
                 ))}
               </div>
             </Field>
-            <Field label="Reminder" align="right">
-              <select
-                value={draft.reminders[0] ?? -1}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  set({ reminders: v < 0 ? [] : [v] });
-                }}
-                className="input-sm w-[150px]"
-              >
-                <option value={-1}>None</option>
-                {REMINDER_OPTIONS.map((o) => (
-                  <option key={o.v} value={o.v}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          <Field label="Repeat">
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={draft.recurrence}
-                onChange={(e) => set({ recurrence: e.target.value as RecurrenceFreq })}
-                className="input-sm w-32 shrink-0"
-              >
-                <option value="none">Doesn't repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekdays">Every weekday</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="custom">Custom</option>
-              </select>
-              {draft.recurrence === "custom" && (
-                <div className="flex items-center gap-1 text-sm text-slate-600 whitespace-nowrap shrink-0">
-                  Every
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={customDaysInput}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setCustomDaysInput(raw);
-                      const n = parseInt(raw, 10);
-                      if (!isNaN(n) && n >= 1 && n <= 999) set({ customIntervalDays: n });
-                    }}
-                    onBlur={() => {
-                      const n = parseInt(customDaysInput, 10);
-                      const clamped = !isNaN(n) ? Math.min(999, Math.max(1, n)) : 1;
-                      setCustomDaysInput(String(clamped));
-                      set({ customIntervalDays: clamped });
-                    }}
-                    className="input-sm w-16 px-1 text-center shrink-0"
-                  />
-                  day(s)
-                </div>
-              )}
-              {draft.recurrence !== "none" && (
+            <Field label="Repeat" align="right">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <select
-                  value={endless ? "endless" : "count"}
-                  onChange={(e) => {
-                    if (e.target.value === "endless") set({ recurrenceOccurrences: null });
-                    else {
-                      const n = parseInt(occurrencesInput, 10);
-                      set({ recurrenceOccurrences: !isNaN(n) && n >= 1 ? n : 5 });
-                    }
-                  }}
+                  value={draft.recurrence}
+                  onChange={(e) => set({ recurrence: e.target.value as RecurrenceFreq })}
                   className="input-sm w-32 shrink-0"
                 >
-                  <option value="endless">Endless</option>
-                  <option value="count">Ends after</option>
+                  <option value="none">Doesn't repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Every weekday</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="custom">Custom</option>
                 </select>
-              )}
-              {draft.recurrence !== "none" && !endless && (
-                <div className="flex items-center gap-1 text-sm text-slate-600 whitespace-nowrap shrink-0">
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={occurrencesInput}
+                {draft.recurrence === "custom" && (
+                  <div className="flex items-center gap-1 text-sm text-slate-600 whitespace-nowrap shrink-0">
+                    Every
+                    <input
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={customDaysInput}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setCustomDaysInput(raw);
+                        const n = parseInt(raw, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 999) set({ customIntervalDays: n });
+                      }}
+                      onBlur={() => {
+                        const n = parseInt(customDaysInput, 10);
+                        const clamped = !isNaN(n) ? Math.min(999, Math.max(1, n)) : 1;
+                        setCustomDaysInput(String(clamped));
+                        set({ customIntervalDays: clamped });
+                      }}
+                      className="input-sm w-16 px-1 text-center shrink-0"
+                    />
+                    day(s)
+                  </div>
+                )}
+                {draft.recurrence !== "none" && (
+                  <select
+                    value={endless ? "endless" : "count"}
                     onChange={(e) => {
-                      const raw = e.target.value;
-                      setOccurrencesInput(raw);
-                      const n = parseInt(raw, 10);
-                      if (!isNaN(n) && n >= 1 && n <= 999) set({ recurrenceOccurrences: n });
+                      if (e.target.value === "endless") set({ recurrenceOccurrences: null });
+                      else {
+                        const n = parseInt(occurrencesInput, 10);
+                        set({ recurrenceOccurrences: !isNaN(n) && n >= 1 ? n : 5 });
+                      }
                     }}
-                    onBlur={() => {
-                      const n = parseInt(occurrencesInput, 10);
-                      const clamped = !isNaN(n) ? Math.min(999, Math.max(1, n)) : 1;
-                      setOccurrencesInput(String(clamped));
-                      set({ recurrenceOccurrences: clamped });
-                    }}
-                    className="input-sm w-16 px-1 text-center shrink-0"
-                  />
-                  time(s)
-                </div>
-              )}
-            </div>
-          </Field>
+                    className="input-sm w-32 shrink-0"
+                  >
+                    <option value="endless">Endless</option>
+                    <option value="count">Ends after</option>
+                  </select>
+                )}
+                {draft.recurrence !== "none" && !endless && (
+                  <div className="flex items-center gap-1 text-sm text-slate-600 whitespace-nowrap shrink-0">
+                    <input
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={occurrencesInput}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setOccurrencesInput(raw);
+                        const n = parseInt(raw, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 999) set({ recurrenceOccurrences: n });
+                      }}
+                      onBlur={() => {
+                        const n = parseInt(occurrencesInput, 10);
+                        const clamped = !isNaN(n) ? Math.min(999, Math.max(1, n)) : 1;
+                        setOccurrencesInput(String(clamped));
+                        set({ recurrenceOccurrences: clamped });
+                      }}
+                      className="input-sm w-16 px-1 text-center shrink-0"
+                    />
+                    time(s)
+                  </div>
+                )}
+              </div>
+            </Field>
+          </div>
         </div>
 
         <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200">
