@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mockParseEvent } from "@/lib/mockParser";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { ParsedEventDraft } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -7,6 +8,27 @@ export const runtime = "nodejs";
 // 自然语言 → 事件草稿。
 // 设了 ANTHROPIC_API_KEY 就调用 Claude；否则用本地 mock 解析器。
 // 这样「先 mock，之后填 key」无需改动任何前端代码。
+//
+// 安全：这个接口会调用 Claude（花钱），所以配置了 Supabase 时必须是已登录用户才能调用，
+// 否则匿名请求能直接烧光 API 额度。再加一个每用户的简单限流。
+
+// 是否启用鉴权：只有配齐了 Supabase 服务端环境变量时才强制（纯本地/demo 模式不挡）。
+const AUTH_ENABLED = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// 每用户限流：滑动窗口，每分钟最多 N 次。注意 Vercel 是无状态多实例，这个内存计数只在
+// 单个实例内有效、冷启动会清零——属于"够用的第一层防滥用"，不是严格的全局限流。
+// 要严格全局限流需要外部存储（Upstash Redis / Supabase 表），规模上来了再加。
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
+const hits = new Map<string, number[]>();
+
+function rateLimited(key: string): boolean {
+  const now = Date.now();
+  const arr = (hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  arr.push(now);
+  hits.set(key, arr);
+  return arr.length > RATE_LIMIT;
+}
 
 const SYSTEM_PROMPT = `You are a calendar event parsing assistant for a notes & calendar app.
 The user gives a natural-language description of a calendar event (English or Chinese).
@@ -80,6 +102,17 @@ async function parseWithClaude(text: string, nowISO: string, tz: string): Promis
 }
 
 export async function POST(req: NextRequest) {
+  // 鉴权（配置了 Supabase 时强制）：必须带有效的登录 token。
+  if (AUTH_ENABLED) {
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) return NextResponse.json({ error: "Sign in to use AI parsing." }, { status: 401 });
+    const { data, error } = await getSupabaseAdmin().auth.getUser(token);
+    if (error || !data.user) return NextResponse.json({ error: "Invalid session." }, { status: 401 });
+    if (rateLimited(data.user.id)) {
+      return NextResponse.json({ error: "Too many requests — please slow down." }, { status: 429 });
+    }
+  }
+
   let body: { text?: string; now?: string; tz?: string };
   try {
     body = await req.json();
@@ -110,6 +143,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const draft = mockParseEvent(text, nowISO);
+  const draft = mockParseEvent(text, nowISO, tz);
   return NextResponse.json({ draft, engine: "mock" });
 }

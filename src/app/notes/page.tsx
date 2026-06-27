@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -64,7 +64,7 @@ export default function NotesPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search title/content/tags…"
-            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-400"
           />
           <label className="flex items-center gap-2 text-xs text-slate-500">
             <input
@@ -145,6 +145,39 @@ function NoteEditor({
 }) {
   const [tagInput, setTagInput] = useState("");
 
+  // 标题/正文本地即时显示，但写库 debounce：以前每敲一个字都发一次 Supabase UPDATE，
+  // 打一段笔记会产生几十上百次网络写入（慢、费、还可能被限流）。现在停止输入 ~600ms
+  // 才真正写一次；切换笔记/卸载时立刻 flush，保证不丢内容。
+  // 离散动作（置顶/归档/标签/提醒/删除）仍然立即保存——它们不是高频输入。
+  const [title, setTitle] = useState(note.title);
+  const [contentHtml, setContentHtml] = useState(note.contentHtml);
+
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const pendingRef = useRef<Partial<typeof note>>({});
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flush = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (Object.keys(pendingRef.current).length) {
+      onChangeRef.current(pendingRef.current);
+      pendingRef.current = {};
+    }
+  };
+
+  const scheduleSave = (patch: Partial<typeof note>) => {
+    pendingRef.current = { ...pendingRef.current, ...patch };
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(flush, 600);
+  };
+
+  // 卸载（切到别的笔记 / 关闭）时把还没写的内容立即保存。这个实例捕获的是当前这条
+  // 笔记的 onChange，所以即使马上切到别的笔记也会写回正确的那一条。
+  useEffect(() => () => flush(), []);
+
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
       <button
@@ -155,8 +188,11 @@ function NoteEditor({
       </button>
       <div className="flex items-center gap-2">
         <input
-          value={note.title}
-          onChange={(e) => onChange({ title: e.target.value })}
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            scheduleSave({ title: e.target.value });
+          }}
           placeholder="Title"
           className="flex-1 text-2xl font-bold focus:outline-none bg-transparent"
         />
@@ -176,7 +212,12 @@ function NoteEditor({
           {note.archived ? "Unarchive" : "Archive"}
         </button>
         <button
-          onClick={onDelete}
+          onClick={() => {
+            // 别让卸载时的 flush 再去写一条已删除的笔记。
+            pendingRef.current = {};
+            if (timerRef.current) clearTimeout(timerRef.current);
+            onDelete();
+          }}
           className="px-2 py-1 rounded text-sm text-red-500 hover:bg-red-50"
         >
           Delete
@@ -210,13 +251,16 @@ function NoteEditor({
             }
           }}
           placeholder="Add tag ↵"
-          className="text-xs border border-slate-200 rounded px-2 py-0.5 w-24 focus:outline-none"
+          className="text-base border border-slate-200 rounded px-2 py-0.5 w-28 focus:outline-none"
         />
       </div>
 
       <RichTextEditor
-        value={note.contentHtml}
-        onChange={(html) => onChange({ contentHtml: html })}
+        value={contentHtml}
+        onChange={(html) => {
+          setContentHtml(html);
+          scheduleSave({ contentHtml: html });
+        }}
       />
 
       {/* Note reminder (SOW 4.2: can manually attach a reminder) */}
@@ -228,7 +272,7 @@ function NoteEditor({
           onChange={(e) =>
             onChange({ reminderAt: e.target.value ? new Date(e.target.value).toISOString() : null })
           }
-          className="border border-slate-300 rounded px-2 py-1 text-sm"
+          className="border border-slate-300 rounded px-2 py-1 text-base"
         />
         {note.reminderAt && (
           <button

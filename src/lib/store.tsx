@@ -185,11 +185,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       else if (created) account = fromDbProfile(created);
     }
 
+    // 设置以数据库为准（跨设备同步）；DB 里没有的字段用默认值补齐。
+    // simulateTrialExpired 是开发用的本地开关，不从 DB 取，避免污染真实账号。
+    const dbSettings = (profileRes.data?.settings ?? {}) as Partial<AppSettings>;
+
     setState((s) => ({
       ...s,
       account,
       events: (eventsRes.data ?? []).map(fromDbEvent),
       notes: (notesRes.data ?? []).map(fromDbNote),
+      settings: { ...DEFAULT_SETTINGS, ...dbSettings, simulateTrialExpired: s.settings.simulateTrialExpired },
     }));
     setReady(true);
   }
@@ -478,8 +483,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      updateSettings: (patch) =>
-        setState((s) => ({ ...s, settings: { ...s.settings, ...patch } })),
+      updateSettings: (patch) => {
+        const next = { ...state.settings, ...patch };
+        setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+        if (supabaseEnabled && supabase && userId) {
+          // simulateTrialExpired 是本地开发开关，不入库。
+          const { simulateTrialExpired, ...toPersist } = next;
+          supabase
+            .from("profiles")
+            .update({ settings: toPersist })
+            .eq("id", userId)
+            .then(({ error }) => error && console.error("updateSettings sync failed", error));
+        }
+      },
 
       addNote: (partial) => {
         const note: Note = {

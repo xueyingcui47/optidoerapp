@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { fromDbEvent } from "@/lib/db";
 import { expandEventsInRange } from "@/lib/recurrence";
+import { unsubscribeUrl } from "@/lib/unsubscribe";
 
 export const runtime = "nodejs";
 
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
   const todayEnd = new Date(todayStart.getTime() + 86_400_000 - 1);
 
   const [{ data: profiles, error: profilesErr }, { data: events, error: eventsErr }] = await Promise.all([
-    admin.from("profiles").select("id, email, name"),
+    admin.from("profiles").select("id, email, name, settings"),
     admin.from("events").select("*"),
   ]);
   if (profilesErr) return NextResponse.json({ error: profilesErr.message }, { status: 500 });
@@ -75,8 +76,16 @@ export async function GET(req: NextRequest) {
   let sent = 0;
   const results: { email: string; eventCount: number; ok: boolean }[] = [];
 
+  // 退订链接需要站点地址；优先用 cron 请求自带的 origin，否则用配置的站点地址。
+  const origin =
+    req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://www.optidoerapp.com";
+
   for (const profile of profiles ?? []) {
     if (!profile.email) continue;
+    // 尊重用户在 Settings 里关掉的"邮件提醒"。settings 存在 profiles 表里（jsonb）。
+    // 没设置过 settings 的老用户默认视为开启（保持原行为）。
+    const emailPref = (profile.settings as any)?.channels?.email;
+    if (emailPref === false) continue;
     const userEvents = eventsByUser.get(profile.id) ?? [];
     const todays = expandEventsInRange(userEvents, todayStart, todayEnd).sort(
       (a, b) => +new Date(a.start) - +new Date(b.start)
@@ -120,6 +129,8 @@ export async function GET(req: NextRequest) {
 
         <p style="font-size: 13px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
           You're receiving this because you have events scheduled today in OptiDoerApp. Open the app anytime to add, edit, or reschedule.
+          <br />
+          <a href="${unsubscribeUrl(origin, profile.id)}" style="color: #94a3b8; text-decoration: underline;">Unsubscribe from daily digests</a>
         </p>
       </div>`;
 

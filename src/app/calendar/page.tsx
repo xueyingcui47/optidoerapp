@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { EventEditor } from "@/components/calendar/EventEditor";
@@ -165,6 +165,7 @@ export default function CalendarPage() {
             events={visibleEvents}
             onSlotClick={openNew}
             onEventClick={openEdit}
+            onEventMove={updateEvent}
           />
         )}
         {view === "day" && (
@@ -173,6 +174,7 @@ export default function CalendarPage() {
             events={visibleEvents}
             onSlotClick={openNew}
             onEventClick={openEdit}
+            onEventMove={updateEvent}
           />
         )}
       </div>
@@ -328,14 +330,39 @@ function TimeGrid({
   events,
   onSlotClick,
   onEventClick,
+  onEventMove,
 }: {
   days: Date[];
   events: CalendarEvent[];
   onSlotClick: (d: Date) => void;
   onEventClick: (e: CalendarEvent) => void;
+  onEventMove: (id: string, patch: Partial<CalendarEvent>) => void;
 }) {
   const hours = Array.from({ length: 24 }, (_, h) => h);
   const HOUR_PX = 48;
+
+  // 拖动时记下"抓的位置离事件块顶部多远"，放下时减掉这个偏移，块顶才会落在指针处而不是
+  // 让指针变成块顶。只对非循环事件开放拖拽（和月视图一致）。
+  const grabOffsetY = useRef(0);
+
+  const handleDrop = (e: React.DragEvent, day: Date) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain");
+    if (!id) return;
+    const ev = events.find((x) => x.id === id);
+    if (!ev) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = e.clientY - rect.top - grabOffsetY.current;
+    const clampedY = Math.max(0, Math.min(24 * HOUR_PX, y));
+    // 落点 → 分钟，按 15 分钟吸附。
+    const rawMinutes = (clampedY / HOUR_PX) * 60;
+    const snapped = Math.round(rawMinutes / 15) * 15;
+    const duration = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+    const newStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+    newStart.setMinutes(snapped);
+    const newEnd = new Date(newStart.getTime() + duration);
+    onEventMove(id, { start: newStart.toISOString(), end: newEnd.toISOString() });
+  };
 
   return (
     <div className="bg-white">
@@ -370,7 +397,12 @@ function TimeGrid({
         {days.map((day, di) => {
           const dayEvents = eventsOnDay(events, day).filter((e) => !e.allDay);
           return (
-            <div key={di} className="relative border-r border-slate-200">
+            <div
+              key={di}
+              className="relative border-r border-slate-200"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => handleDrop(e, day)}
+            >
               {hours.map((h) => (
                 <div
                   key={h}
@@ -395,11 +427,20 @@ function TimeGrid({
                   18,
                   ((e.getTime() - s.getTime()) / 3_600_000) * HOUR_PX
                 );
+                const draggable = ev.recurrence === "none";
                 return (
                   <button
                     key={ev.id}
+                    draggable={draggable}
+                    onDragStart={(e) => {
+                      grabOffsetY.current = e.nativeEvent.offsetY;
+                      e.dataTransfer.setData("text/plain", ev.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
                     onClick={() => onEventClick(ev)}
-                    className={`absolute left-1 right-1 rounded text-[11px] px-1 py-0.5 text-left overflow-hidden ${eventBlockClasses(ev)}`}
+                    className={`absolute left-1 right-1 rounded text-[11px] px-1 py-0.5 text-left overflow-hidden ${eventBlockClasses(ev)} ${
+                      draggable ? "cursor-grab active:cursor-grabbing" : ""
+                    }`}
                     style={{ top, height }}
                   >
                     <div className="font-medium truncate">{ev.title || "(untitled)"}</div>

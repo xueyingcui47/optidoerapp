@@ -25,6 +25,9 @@ create table if not exists public.profiles (
   -- 真实 Stripe 订阅的账号/订单 ID（webhook 用来找回是哪个用户、之后管理订阅用）。
   stripe_customer_id text,
   stripe_subscription_id text,
+  -- 用户偏好设置（通知渠道、提醒提前量、AI 开关等）。放进数据库才能跨设备同步，
+  -- 而且服务端的每日 digest 才读得到"是否关了邮件提醒"。
+  settings jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
