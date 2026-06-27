@@ -32,65 +32,56 @@ export function EventEditor({
   const dateError =
     new Date(draft.end) < new Date(draft.start) ? "End must be on or after the start." : null;
 
-  // AI natural-language input
+  // AI natural-language input —— 折叠在一个按钮后面，点开后输入、点一次「AI fill in」
+  // 就直接解析 + 保存 + 关闭，不需要再手动点 Save。
+  const [showAi, setShowAi] = useState(false);
   const [nl, setNl] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiMsg, setAiMsg] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  const runAi = async () => {
-    if (!nl.trim()) return;
+  // 一键完成：解析结果直接拼成事件存库并关闭。不依赖 setDraft 后的 state（那是异步的，
+  // 紧接着 save 会拿到旧值），而是用解析出来的值现场构造要保存的事件。
+  const runAiAndSave = async () => {
+    if (!nl.trim() || aiBusy) return;
     setAiBusy(true);
     setAiError(null);
-    setAiMsg(null);
     try {
-      const { draft: parsed, engine, fallback } = await parseEvent(nl.trim());
-      const recurrence = parsed.recurrence ?? "none";
-      const recurrenceOccurrences = parsed.recurrenceOccurrences ?? null;
-      set({
-        title: parsed.title || draft.title,
+      const { draft: parsed, engine } = await parseEvent(nl.trim());
+      const next: Draft = {
+        ...draft,
+        title: parsed.title || draft.title || "(untitled)",
         location: parsed.location || "",
         description: parsed.description || "",
         allDay: parsed.allDay,
         start: parsed.start || draft.start,
         end: parsed.end || draft.end,
         source: "ai",
-        recurrence,
+        recurrence: parsed.recurrence ?? "none",
         customIntervalDays: parsed.customIntervalDays ?? undefined,
-        recurrenceOccurrences,
-      });
-      // Keep the buffered number-input text in sync, since those inputs hold their own
-      // typing-friendly local state separate from the draft (see customDaysInput/occurrencesInput).
-      if (recurrence === "custom") setCustomDaysInput(String(parsed.customIntervalDays ?? 1));
-      if (recurrenceOccurrences != null) setOccurrencesInput(String(recurrenceOccurrences));
+        recurrenceOccurrences: parsed.recurrenceOccurrences ?? null,
+      };
+      if (new Date(next.end) < new Date(next.start)) {
+        setAiError("The parsed end time is before the start — please create it manually.");
+        setAiBusy(false);
+        return;
+      }
       logAi({
         feature: "nl-event",
         inputChars: nl.trim().length,
         engine,
         summary: parsed.title || "(untitled)",
       });
-      const conf = { high: "high", medium: "medium", low: "low" }[parsed.confidence];
-      setAiMsg(
-        `Generated (engine: ${engine === "claude" ? "Claude" : "local mock"}${
-          fallback ? ", Claude call failed and fell back" : ""
-        }, confidence: ${conf}). ${parsed.note ?? ""}Please review before saving.`
-      );
+      // 第一次用即视为已知悉隐私说明（下方有一行常驻提示），不再弹窗多点一次。
+      if (!state.settings.aiPrivacyAcknowledged) updateSettings({ aiPrivacyAcknowledged: true });
+      if (editingId) updateEvent(editingId, next);
+      else addEvent(next);
+      onClose();
     } catch (e) {
       setAiError((e as Error).message);
-    } finally {
       setAiBusy(false);
     }
-  };
-
-  const handleAiClick = () => {
-    if (!state.settings.aiPrivacyAcknowledged) {
-      setShowPrivacy(true);
-      return;
-    }
-    runAi();
   };
 
   const save = () => {
@@ -126,44 +117,6 @@ export function EventEditor({
         </div>
 
         <div className="p-5 space-y-4">
-          {/* AI natural-language creation (flagship feature) — full access during trial,
-              AI Plan only once subscribed. */}
-          {state.settings.aiNlEventEnabled && aiAllowed && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3">
-              <div className="text-sm font-medium text-brand-800 mb-2">
-                ✨ Create with natural language
-              </div>
-              <textarea
-                value={nl}
-                onChange={(e) => setNl(e.target.value)}
-                placeholder="e.g. lunch with Sam tomorrow at noon / next monday 10am-11am sync"
-                rows={2}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-400"
-              />
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={handleAiClick}
-                  disabled={aiBusy || !nl.trim()}
-                  className="rounded-lg bg-brand-600 text-white text-sm px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {aiBusy ? "Parsing…" : "AI fill in"}
-                </button>
-                {aiMsg && <span className="text-xs text-slate-600">{aiMsg}</span>}
-                {aiError && <span className="text-xs text-red-600">{aiError}</span>}
-              </div>
-            </div>
-          )}
-          {state.settings.aiNlEventEnabled && !aiAllowed && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
-              <div className="text-sm text-slate-600">
-                ✨ <strong>Create with natural language</strong> is an AI Plan feature.
-              </div>
-              <a href="/settings" className="text-sm text-brand-600 font-medium hover:underline whitespace-nowrap">
-                Upgrade
-              </a>
-            </div>
-          )}
-
           <Field label="Title">
             <input
               value={draft.title}
@@ -351,6 +304,59 @@ export function EventEditor({
               </div>
             </Field>
           </div>
+
+          {/* AI 自然语言建事件：默认折叠成一个按钮，点开后输入、点一次 AI fill in 直接
+              解析并保存关闭。订阅后非 AI 档（tier2）的用户看到的是升级提示。 */}
+          {state.settings.aiNlEventEnabled && aiAllowed && (
+            <div className="pt-1">
+              {!showAi ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAi(true)}
+                  className="w-full rounded-xl border border-brand-200 bg-brand-50/60 text-brand-700 text-sm font-medium py-2.5 hover:bg-brand-50"
+                >
+                  ✨ Create with AI instead
+                </button>
+              ) : (
+                <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3">
+                  <div className="text-sm font-medium text-brand-800 mb-2">
+                    ✨ Describe the event in your own words
+                  </div>
+                  <textarea
+                    value={nl}
+                    onChange={(e) => setNl(e.target.value)}
+                    placeholder="e.g. lunch with Sam tomorrow at noon / next monday 10am-11am sync"
+                    rows={2}
+                    autoFocus
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={runAiAndSave}
+                      disabled={aiBusy || !nl.trim()}
+                      className="rounded-lg bg-brand-600 text-white text-sm px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {aiBusy ? "Working…" : "AI fill in"}
+                    </button>
+                    {aiError && <span className="text-xs text-red-600">{aiError}</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Sends your text to Anthropic Claude for parsing. Turn this off anytime in Settings → AI.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          {state.settings.aiNlEventEnabled && !aiAllowed && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
+              <div className="text-sm text-slate-600">
+                ✨ <strong>Create with AI</strong> is an AI Plan feature.
+              </div>
+              <a href="/settings" className="text-sm text-brand-600 font-medium hover:underline whitespace-nowrap">
+                Upgrade
+              </a>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200">
@@ -388,41 +394,6 @@ export function EventEditor({
         </div>
       </div>
 
-      {/* First-time AI privacy acknowledgement (SOW 4.4b.3 / AI guide 4.1) */}
-      {showPrivacy && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
-            <h3 className="font-semibold text-slate-800 mb-2">About AI parsing & privacy</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              This feature sends the text you type to an AI service (Anthropic Claude) for parsing.
-              Anthropic does not use your data to train its models. You can turn this off or review
-              your history anytime in Settings → AI.
-              <br />
-              <br />
-              If no API key is configured, this uses a <b>local mock parser</b> instead — your data
-              never leaves this device.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowPrivacy(false)}
-                className="text-sm text-slate-600 rounded px-3 py-1.5 hover:bg-slate-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  updateSettings({ aiPrivacyAcknowledged: true });
-                  setShowPrivacy(false);
-                  runAi();
-                }}
-                className="text-sm bg-brand-600 text-white rounded px-4 py-1.5 hover:bg-brand-700"
-              >
-                Agree & continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Recurring event delete: ask whether to truncate the series or remove all of it. */}
       {showDeleteChoice && editingId && (

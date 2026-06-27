@@ -76,7 +76,7 @@ export function RichTextEditor({
         suppressContentEditableWarning
         data-placeholder={placeholder}
         onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
-        className="rte-content min-h-[200px] p-3 focus:outline-none"
+        className="rte-content min-h-[272px] p-3 focus:outline-none"
       />
     </div>
   );
