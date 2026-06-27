@@ -199,7 +199,7 @@ export function EventEditor({
             <textarea
               value={draft.description}
               onChange={(e) => set({ description: e.target.value })}
-              rows={2}
+              rows={5}
               className="input"
             />
           </Field>
