@@ -200,7 +200,7 @@ export function EventEditor({
               value={draft.description}
               onChange={(e) => set({ description: e.target.value })}
               rows={5}
-              className="input"
+              className="input min-h-[150px] resize-y"
             />
           </Field>
 
