@@ -164,7 +164,7 @@ export function EventEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center flex-wrap gap-1">
                 <input
                   type="date"
                   value={toLocalInputValue(new Date(draft.start)).slice(0, 10)}
@@ -179,7 +179,7 @@ export function EventEditor({
                       : new Date(newStart.getTime() + 60 * 60 * 1000);
                     set({ start: newStart.toISOString(), end: newEnd.toISOString() });
                   }}
-                  className="input w-[7.4rem] shrink-0 px-1.5"
+                  className="input w-[6rem] shrink-0 px-1"
                 />
                 {!draft.allDay && (
                   <TimeOfDayPicker
@@ -193,7 +193,7 @@ export function EventEditor({
               </div>
             </Field>
             <Field label="End">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center flex-wrap gap-1">
                 <input
                   type="date"
                   value={toLocalInputValue(new Date(draft.end)).slice(0, 10)}
@@ -203,7 +203,7 @@ export function EventEditor({
                     if (!draft.allDay) newEnd.setHours(cur.getHours(), cur.getMinutes(), 0, 0);
                     set({ end: newEnd.toISOString() });
                   }}
-                  className="input w-[7.4rem] shrink-0 px-1.5"
+                  className="input w-[6rem] shrink-0 px-1"
                 />
                 {!draft.allDay && (
                   <TimeOfDayPicker value={new Date(draft.end)} onChange={(newEnd) => set({ end: newEnd.toISOString() })} />
