@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseEvent } from "@/lib/ai";
 import { AI_EVENT_CREATE_ENABLED } from "@/lib/featureFlags";
@@ -109,27 +109,46 @@ export function EventEditor({
     onClose();
   };
 
-  // 点对话框外面：标题是空的就没必要保存一个空事件，直接关掉/放弃这次编辑就好。
-  const handleBackdropClick = () => {
-    if (!draft.title.trim()) {
-      onClose();
-      return;
-    }
-    save();
+  // 电脑上对话框可以拖动：按住标题栏拖（不是点叉叉/点字段那些），松手定住。
+  // 用 transform 叠加在 flex 居中之上的偏移量，所以坐标系是"相对初始居中位置"。
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragState = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+
+  const onHeaderMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return; // 别让按 × 也触发拖动
+    dragState.current = { startX: e.clientX, startY: e.clientY, baseX: dragOffset.x, baseY: dragOffset.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      setDragOffset({
+        x: dragState.current.baseX + (ev.clientX - dragState.current.startX),
+        y: dragState.current.baseY + (ev.clientY - dragState.current.startY),
+      });
+    };
+    const onUp = () => {
+      dragState.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   return (
-    // inner box 上的 stopPropagation 防止点对话框内部时误触发外层这个保存动作。
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={handleBackdropClick}>
+    // 点对话框外面现在什么都不做（不保存也不关闭）——只能用叉叉或 Save/Cancel 按钮操作。
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
       <div
         className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
-        onClick={(e) => e.stopPropagation()}
+        style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+        <div
+          onMouseDown={onHeaderMouseDown}
+          className="flex items-center justify-between px-5 py-3 border-b border-slate-200 cursor-move select-none"
+        >
           <h2 className="font-semibold text-slate-800">
             {editingId ? "Edit event" : "New event"}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">
+          {/* 叉叉现在等同于点 Save：保存并关闭，不再是单纯放弃。 */}
+          <button onClick={save} className="text-slate-400 hover:text-slate-700 text-xl">
             ×
           </button>
         </div>
