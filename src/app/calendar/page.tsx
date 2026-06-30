@@ -49,6 +49,10 @@ export default function CalendarPage() {
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(new Date());
   const [editor, setEditor] = useState<{ initial: Draft; id: string | null; occurrenceIndex: number } | null>(null);
+  // 手机上点月视图里的某一天：不直接弹"新建事件"（格子太小很容易点错/误触），
+  // 而是把那一天所在的周放到顶部、用放大的列表展示，方便看清楚再点进具体一项。
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 从别的页面（Today/Reminders）点一个事件跳过来时，用 ?event=<id> 直接打开它的编辑框。
   useEffect(() => {
@@ -62,6 +66,19 @@ export default function CalendarPage() {
   }, [searchParams, state.events]);
 
   const openNew = (start: Date) => setEditor({ initial: newDraft(start), id: null, occurrenceIndex: 0 });
+
+  // sm 断点（640px）以下视为手机：手机上点一天先展开当周的放大列表，不立刻新建事件。
+  const isMobileViewport = () =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+
+  const handleDayTap = (day: Date) => {
+    if (view === "month" && isMobileViewport()) {
+      setSelectedDay(day);
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    openNew(day);
+  };
   const openEdit = (ev: CalendarEvent) => {
     // Recurring occurrences carry a synthetic id ("<id>::<n>") — editing always shows/saves
     // the original series' fields, but deleting needs to know which occurrence was clicked
@@ -149,12 +166,21 @@ export default function CalendarPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto bg-slate-50">
+      <div ref={scrollRef} className="flex-1 overflow-auto bg-slate-50">
+        {view === "month" && selectedDay && (
+          <WeekAgenda
+            day={selectedDay}
+            events={visibleEvents}
+            onEventClick={openEdit}
+            onAddClick={openNew}
+            onClose={() => setSelectedDay(null)}
+          />
+        )}
         {view === "month" && (
           <MonthGrid
             cursor={cursor}
             events={visibleEvents}
-            onDayClick={openNew}
+            onDayClick={handleDayTap}
             onEventClick={openEdit}
             onEventMove={updateEvent}
           />
@@ -213,6 +239,76 @@ function weekNum(d: Date): number {
 function weekDays(cursor: Date): Date[] {
   const s = startOfWeek(cursor);
   return Array.from({ length: 7 }, (_, i) => addDays(s, i));
+}
+
+/* ───────────── 手机端：选中周的放大列表（点格子误触的替代方案） ───────────── */
+function WeekAgenda({
+  day,
+  events,
+  onEventClick,
+  onAddClick,
+  onClose,
+}: {
+  day: Date;
+  events: CalendarEvent[];
+  onEventClick: (e: CalendarEvent) => void;
+  onAddClick: (d: Date) => void;
+  onClose: () => void;
+}) {
+  const days = weekDays(day);
+  return (
+    <div className="sm:hidden sticky top-0 z-20 border-b-2 border-brand-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between px-3 py-2 bg-brand-50/60">
+        <div className="text-sm font-semibold text-slate-700">
+          {fmtMonthYear(startOfWeek(day))} · Week {weekNum(day)}
+        </div>
+        <button onClick={onClose} className="text-xs text-slate-400 px-2 py-1">
+          Collapse ✕
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+        {days.map((d, i) => {
+          const dayEvents = eventsOnDay(events, d);
+          const selected = sameDay(d, day);
+          return (
+            <div key={i} className={`px-3 py-2.5 ${selected ? "bg-brand-50/40" : ""}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div
+                  className={`text-sm font-medium ${
+                    isToday(d) ? "text-brand-600" : selected ? "text-slate-800" : "text-slate-500"
+                  }`}
+                >
+                  {WEEK_LABELS[i]} {d.getDate()}
+                </div>
+                <button
+                  onClick={() => onAddClick(d)}
+                  className="text-xs text-brand-600 px-2.5 py-1.5 rounded-lg hover:bg-brand-50"
+                >
+                  ＋ Add
+                </button>
+              </div>
+              {dayEvents.length === 0 ? (
+                <div className="text-xs text-slate-300 py-1">No events</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {dayEvents.map((ev) => (
+                    <button
+                      key={ev.id}
+                      onClick={() => onEventClick(ev)}
+                      className={`block w-full text-left rounded-lg px-3 py-2.5 text-sm ${eventPillClasses(ev)}`}
+                    >
+                      {!ev.allDay && <span className="opacity-70 mr-2">{fmtTime(new Date(ev.start))}</span>}
+                      {ev.title || "(untitled)"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /* ───────────────── 月视图 ───────────────── */
