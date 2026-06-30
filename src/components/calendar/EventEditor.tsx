@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { parseEvent } from "@/lib/ai";
+import { AI_EVENT_CREATE_ENABLED } from "@/lib/featureFlags";
 import { parseLocalDateOnly, toLocalInputValue } from "@/lib/date";
 import { EVENT_COLOR_OPTIONS } from "@/lib/eventColors";
 import type { CalendarEvent, RecurrenceFreq } from "@/lib/types";
@@ -29,6 +30,23 @@ export function EventEditor({
   // 试用期间给全功能（含 AI）；订阅后只有 AI 档（tier2）才能用自然语言建事件。
   const aiAllowed = !state.account?.subscribed || state.account.plan === "tier2";
   const [showDeleteChoice, setShowDeleteChoice] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // 循环事件：完成状态是按次的，不是整个系列共享一个布尔值——勾这一次完成，
+  // 不会影响以前/以后的其它次。
+  const isRecurringOccurrence = draft.recurrence !== "none";
+  const completedForThis = isRecurringOccurrence
+    ? (draft.completedOccurrences ?? []).includes(occurrenceIndex)
+    : draft.completed;
+  const toggleCompleted = (checked: boolean) => {
+    if (!isRecurringOccurrence) {
+      set({ completed: checked });
+      return;
+    }
+    const cur = new Set(draft.completedOccurrences ?? []);
+    if (checked) cur.add(occurrenceIndex);
+    else cur.delete(occurrenceIndex);
+    set({ completedOccurrences: Array.from(cur).sort((a, b) => a - b) });
+  };
   const dateError =
     new Date(draft.end) < new Date(draft.start) ? "End must be on or after the start." : null;
 
@@ -129,8 +147,8 @@ export function EventEditor({
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input
                 type="checkbox"
-                checked={draft.completed}
-                onChange={(e) => set({ completed: e.target.checked })}
+                checked={completedForThis}
+                onChange={(e) => toggleCompleted(e.target.checked)}
               />
               Completed
             </label>
@@ -306,8 +324,9 @@ export function EventEditor({
           </div>
 
           {/* AI 自然语言建事件：默认折叠成一个按钮，点开后输入、点一次 AI fill in 直接
-              解析并保存关闭。订阅后非 AI 档（tier2）的用户看到的是升级提示。 */}
-          {state.settings.aiNlEventEnabled && aiAllowed && (
+              解析并保存关闭。订阅后非 AI 档（tier2）的用户看到的是升级提示。
+              暂时整体隔离掉（AI_EVENT_CREATE_ENABLED=false），以后要加回来只需把开关改回 true。 */}
+          {AI_EVENT_CREATE_ENABLED && state.settings.aiNlEventEnabled && aiAllowed && (
             <div className="pt-1">
               {!showAi ? (
                 <button
@@ -347,7 +366,7 @@ export function EventEditor({
               )}
             </div>
           )}
-          {state.settings.aiNlEventEnabled && !aiAllowed && (
+          {AI_EVENT_CREATE_ENABLED && state.settings.aiNlEventEnabled && !aiAllowed && (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
               <div className="text-sm text-slate-600">
                 ✨ <strong>Create with AI</strong> is an AI Plan feature.
@@ -365,10 +384,7 @@ export function EventEditor({
               <button
                 onClick={() => {
                   if (draft.recurrence !== "none") setShowDeleteChoice(true);
-                  else {
-                    deleteEvent(editingId);
-                    onClose();
-                  }
+                  else setShowDeleteConfirm(true);
                 }}
                 className="text-sm text-red-500 hover:bg-red-50 rounded px-3 py-1.5"
               >
@@ -394,6 +410,34 @@ export function EventEditor({
         </div>
       </div>
 
+
+      {/* Non-recurring delete: simple confirm so a stray tap can't wipe an event. */}
+      {showDeleteConfirm && editingId && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+            <h3 className="font-semibold text-slate-800 mb-2">Delete this event?</h3>
+            <p className="text-sm text-slate-600 mb-4">This can't be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="text-sm text-slate-600 rounded-lg px-3 py-2 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteEvent(editingId);
+                  setShowDeleteConfirm(false);
+                  onClose();
+                }}
+                className="text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg px-3 py-2"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recurring event delete: ask whether to truncate the series or remove all of it. */}
       {showDeleteChoice && editingId && (

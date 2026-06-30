@@ -39,6 +39,9 @@ export interface CalendarEvent {
   customIntervalDays?: number;
   /** 重复次数上限；undefined/null = 无限重复，否则重复 N 次后结束（recurrence !== "none" 时才有意义）。 */
   recurrenceOccurrences?: number | null;
+  /** recurrence !== "none" 时使用：单独勾选完成的那几次的下标（0 = 原始那次）。
+   *  不影响其它次——勾这次完成，不会把整个系列或以后的次数都标完成。 */
+  completedOccurrences?: number[];
   /** 提醒提前量列表（分钟）。 */
   reminders: ReminderOffset[];
   /** 标记来源，AI 生成的事件会标 "ai"。 */

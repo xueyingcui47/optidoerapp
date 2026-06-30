@@ -79,6 +79,8 @@ export function expandOccurrences(ev: CalendarEvent, rangeStart: Date, rangeEnd:
         id: i === 0 ? ev.id : `${ev.id}::${i}`,
         start: start.toISOString(),
         end: end.toISOString(),
+        // 循环事件的"完成"是按次的：每次单独勾选，不是整个系列共享一个布尔值。
+        completed: (ev.completedOccurrences ?? []).includes(i),
       });
     }
   }

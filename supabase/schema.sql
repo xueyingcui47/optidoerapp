@@ -105,6 +105,9 @@ create table if not exists public.events (
   recurrence text not null default 'none',
   custom_interval_days int,
   recurrence_occurrences int,
+  -- 循环事件里，单独被勾选「完成」的那几次的下标（0 = 原始那次）。recurrence != 'none' 时，
+  -- 是否完成看这个数组而不是上面的 completed 字段——这样勾一次只影响当次，不影响以后的。
+  completed_occurrences int[] not null default '{}',
   reminders int[] not null default '{}',
   source text not null default 'manual',
   created_at timestamptz not null default now(),

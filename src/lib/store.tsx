@@ -84,6 +84,7 @@ const EVENT_COL: Record<string, string> = {
   allDay: "all_day",
   customIntervalDays: "custom_interval_days",
   recurrenceOccurrences: "recurrence_occurrences",
+  completedOccurrences: "completed_occurrences",
   createdAt: "created_at",
   updatedAt: "updated_at",
 };

@@ -144,6 +144,7 @@ function NoteEditor({
   onBack: () => void;
 }) {
   const [tagInput, setTagInput] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // 标题/正文本地即时显示，但写库 debounce：以前每敲一个字都发一次 Supabase UPDATE，
   // 打一段笔记会产生几十上百次网络写入（慢、费、还可能被限流）。现在停止输入 ~600ms
@@ -212,17 +213,41 @@ function NoteEditor({
           {note.archived ? "Unarchive" : "Archive"}
         </button>
         <button
-          onClick={() => {
-            // 别让卸载时的 flush 再去写一条已删除的笔记。
-            pendingRef.current = {};
-            if (timerRef.current) clearTimeout(timerRef.current);
-            onDelete();
-          }}
+          onClick={() => setShowDeleteConfirm(true)}
           className="px-2 py-1 rounded text-sm text-red-500 hover:bg-red-50"
         >
           Delete
         </button>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+            <h3 className="font-semibold text-slate-800 mb-2">Delete this note?</h3>
+            <p className="text-sm text-slate-600 mb-4">This can't be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="text-sm text-slate-600 rounded-lg px-3 py-2 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // 别让卸载时的 flush 再去写一条已删除的笔记。
+                  pendingRef.current = {};
+                  if (timerRef.current) clearTimeout(timerRef.current);
+                  setShowDeleteConfirm(false);
+                  onDelete();
+                }}
+                className="text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg px-3 py-2"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tags */}
       <div className="flex flex-wrap items-center gap-2">

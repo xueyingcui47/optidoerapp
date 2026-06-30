@@ -19,6 +19,7 @@ import {
 import type { CalendarEvent } from "@/lib/types";
 import { eventBlockClasses, eventPillClasses } from "@/lib/eventColors";
 import { baseEventId, expandEventsInRange, occurrenceIndex } from "@/lib/recurrence";
+import { AI_EVENT_CREATE_ENABLED } from "@/lib/featureFlags";
 
 type View = "month" | "week" | "day";
 type Draft = Omit<CalendarEvent, "id" | "createdAt" | "updatedAt">;
@@ -161,7 +162,7 @@ export default function CalendarPage() {
             className="text-sm bg-brand-600 text-white rounded-lg px-3 py-1.5 hover:bg-brand-700 whitespace-nowrap"
           >
             <span className="sm:hidden">＋ New</span>
-            <span className="hidden sm:inline">＋ New / AI create</span>
+            <span className="hidden sm:inline">＋ New{AI_EVENT_CREATE_ENABLED ? " / AI create" : ""}</span>
           </button>
         </div>
       </header>

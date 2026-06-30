@@ -7,6 +7,7 @@ import { PRICING, PlanCard } from "@/components/Paywall";
 import { supabase, supabaseEnabled } from "@/lib/supabaseClient";
 import { isNativeApp } from "@/lib/platform";
 import { openBillingPortal, stripeEnabled } from "@/lib/stripeClient";
+import { AI_EVENT_CREATE_ENABLED } from "@/lib/featureFlags";
 
 export default function SettingsPage() {
   const {
@@ -179,12 +180,14 @@ export default function SettingsPage() {
 
       {/* AI */}
       <Section title="AI features">
-        <Toggle
-          label="Natural-language event creation"
-          desc='Type "lunch with Sam tomorrow at noon" in the calendar to auto-generate an event.'
-          checked={s.aiNlEventEnabled}
-          onChange={(v) => updateSettings({ aiNlEventEnabled: v })}
-        />
+        {AI_EVENT_CREATE_ENABLED && (
+          <Toggle
+            label="Natural-language event creation"
+            desc='Type "lunch with Sam tomorrow at noon" in the calendar to auto-generate an event.'
+            checked={s.aiNlEventEnabled}
+            onChange={(v) => updateSettings({ aiNlEventEnabled: v })}
+          />
+        )}
         <div className="flex items-start justify-between py-2 opacity-60">
           <div>
             <div className="text-sm text-slate-700">Smart schedule suggestions</div>
