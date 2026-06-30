@@ -164,7 +164,7 @@ export function EventEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start">
-              <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="date"
                   value={toLocalInputValue(new Date(draft.start)).slice(0, 10)}
@@ -179,7 +179,7 @@ export function EventEditor({
                       : new Date(newStart.getTime() + 60 * 60 * 1000);
                     set({ start: newStart.toISOString(), end: newEnd.toISOString() });
                   }}
-                  className="input"
+                  className="input w-[7.4rem] shrink-0 px-1.5"
                 />
                 {!draft.allDay && (
                   <TimeOfDayPicker
@@ -193,7 +193,7 @@ export function EventEditor({
               </div>
             </Field>
             <Field label="End">
-              <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="date"
                   value={toLocalInputValue(new Date(draft.end)).slice(0, 10)}
@@ -203,7 +203,7 @@ export function EventEditor({
                     if (!draft.allDay) newEnd.setHours(cur.getHours(), cur.getMinutes(), 0, 0);
                     set({ end: newEnd.toISOString() });
                   }}
-                  className="input"
+                  className="input w-[7.4rem] shrink-0 px-1.5"
                 />
                 {!draft.allDay && (
                   <TimeOfDayPicker value={new Date(draft.end)} onChange={(newEnd) => set({ end: newEnd.toISOString() })} />
@@ -535,48 +535,31 @@ function Field({
   );
 }
 
-function hour24To12(h: number): { h12: number; ampm: "AM" | "PM" } {
-  const ampm = h >= 12 ? "PM" : "AM";
-  let h12 = h % 12;
-  if (h12 === 0) h12 = 12;
-  return { h12, ampm };
-}
-
-function hour12To24(h12: number, ampm: "AM" | "PM"): number {
-  const h = h12 % 12;
-  return ampm === "PM" ? h + 12 : h;
-}
-
-const HOURS_1_TO_12 = Array.from({ length: 12 }, (_, i) => i + 1);
+const HOURS_0_TO_23 = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES_0_TO_59 = Array.from({ length: 60 }, (_, i) => i);
 
 // 时间选择用普通 <select> 而不是原生 time/datetime-local 那种滚轮控件——下拉列表天生
-// 到了第一项/最后一项就停住，不会像滚轮一样从 12 转回 1、从 59 转回 0。
+// 到了第一项/最后一项就停住，不会像滚轮一样从 23 转回 0。24 小时制，不需要 AM/PM。
 function TimeOfDayPicker({ value, onChange }: { value: Date; onChange: (next: Date) => void }) {
-  const { h12, ampm } = hour24To12(value.getHours());
+  const hour = value.getHours();
   const minute = value.getMinutes();
 
-  const apply = (patch: { h12?: number; minute?: number; ampm?: "AM" | "PM" }) => {
+  const apply = (patch: { hour?: number; minute?: number }) => {
     const next = new Date(value);
-    next.setHours(
-      hour12To24(patch.h12 ?? h12, patch.ampm ?? ampm),
-      patch.minute ?? minute,
-      0,
-      0
-    );
+    next.setHours(patch.hour ?? hour, patch.minute ?? minute, 0, 0);
     onChange(next);
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 min-w-0">
       <select
-        value={h12}
-        onChange={(e) => apply({ h12: Number(e.target.value) })}
-        className="input px-1.5 min-w-0 flex-1"
+        value={hour}
+        onChange={(e) => apply({ hour: Number(e.target.value) })}
+        className="input px-1 min-w-0"
       >
-        {HOURS_1_TO_12.map((h) => (
+        {HOURS_0_TO_23.map((h) => (
           <option key={h} value={h}>
-            {h}
+            {String(h).padStart(2, "0")}
           </option>
         ))}
       </select>
@@ -584,21 +567,13 @@ function TimeOfDayPicker({ value, onChange }: { value: Date; onChange: (next: Da
       <select
         value={minute}
         onChange={(e) => apply({ minute: Number(e.target.value) })}
-        className="input px-1.5 min-w-0 flex-1"
+        className="input px-1 min-w-0"
       >
         {MINUTES_0_TO_59.map((m) => (
           <option key={m} value={m}>
             {String(m).padStart(2, "0")}
           </option>
         ))}
-      </select>
-      <select
-        value={ampm}
-        onChange={(e) => apply({ ampm: e.target.value as "AM" | "PM" })}
-        className="input px-1.5 min-w-0 flex-1"
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
       </select>
     </div>
   );
