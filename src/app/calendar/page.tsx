@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { EventEditor } from "@/components/calendar/EventEditor";
 import { eventsOnDay } from "@/lib/reminders";
@@ -17,7 +17,7 @@ import {
   startOfWeek,
 } from "@/lib/date";
 import type { CalendarEvent } from "@/lib/types";
-import { eventBlockClasses, eventPillClasses } from "@/lib/eventColors";
+import { EVENT_COLOR_OPTIONS, eventBlockClasses, eventPillClasses } from "@/lib/eventColors";
 import { baseEventId, expandEventsInRange, occurrenceIndex } from "@/lib/recurrence";
 import { AI_EVENT_CREATE_ENABLED } from "@/lib/featureFlags";
 
@@ -47,6 +47,7 @@ function newDraft(start: Date): Draft {
 export default function CalendarPage() {
   const { state, updateEvent } = useStore();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(new Date());
   const [editor, setEditor] = useState<{ initial: Draft; id: string | null; occurrenceIndex: number } | null>(null);
@@ -54,6 +55,13 @@ export default function CalendarPage() {
   // 而是把那一天所在的周放到顶部、用放大的列表展示，方便看清楚再点进具体一项。
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 手机底部 Calendar 标签再次点击时收起 WeekAgenda，回到纯网格视图。
+  useEffect(() => {
+    const reset = () => setSelectedDay(null);
+    window.addEventListener("calendar:reset", reset);
+    return () => window.removeEventListener("calendar:reset", reset);
+  }, []);
 
   // 从别的页面（Today/Reminders）点一个事件跳过来时，用 ?event=<id> 直接打开它的编辑框。
   useEffect(() => {
@@ -63,8 +71,11 @@ export default function CalendarPage() {
     if (ev) {
       setCursor(new Date(ev.start));
       setEditor({ initial: { ...ev }, id: ev.id, occurrenceIndex: 0 });
+      // Strip the ?event= param so saving (which updates state.events) doesn't
+      // re-trigger this effect and reopen the editor after it's closed.
+      router.replace("/calendar");
     }
-  }, [searchParams, state.events]);
+  }, [searchParams]); // intentionally excludes state.events — only re-run when URL changes
 
   const openNew = (start: Date) => setEditor({ initial: newDraft(start), id: null, occurrenceIndex: 0 });
 
@@ -167,24 +178,27 @@ export default function CalendarPage() {
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-auto bg-slate-50">
+      <div ref={scrollRef} className={`flex-1 overflow-auto ${view === "month" && selectedDay ? "bg-white" : "bg-slate-50"}`}>
         {view === "month" && selectedDay && (
-          <WeekAgenda
-            day={selectedDay}
+          <MobileDayView
+            selectedDay={selectedDay}
             events={visibleEvents}
+            onDayChange={setSelectedDay}
             onEventClick={openEdit}
             onAddClick={openNew}
             onClose={() => setSelectedDay(null)}
           />
         )}
         {view === "month" && (
-          <MonthGrid
-            cursor={cursor}
-            events={visibleEvents}
-            onDayClick={handleDayTap}
-            onEventClick={openEdit}
-            onEventMove={updateEvent}
-          />
+          <div className={selectedDay ? "hidden sm:block" : ""}>
+            <MonthGrid
+              cursor={cursor}
+              events={visibleEvents}
+              onDayClick={handleDayTap}
+              onEventClick={openEdit}
+              onEventMove={updateEvent}
+            />
+          </div>
         )}
         {view === "week" && (
           <TimeGrid
@@ -242,71 +256,144 @@ function weekDays(cursor: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(s, i));
 }
 
-/* ───────────── 手机端：选中周的放大列表（点格子误触的替代方案） ───────────── */
-function WeekAgenda({
-  day,
+/* ─────────────── 手机端：TickTick 风格 day view ─────────────── */
+function MobileDayView({
+  selectedDay,
   events,
+  onDayChange,
   onEventClick,
   onAddClick,
   onClose,
 }: {
-  day: Date;
+  selectedDay: Date;
   events: CalendarEvent[];
+  onDayChange: (d: Date) => void;
   onEventClick: (e: CalendarEvent) => void;
   onAddClick: (d: Date) => void;
   onClose: () => void;
 }) {
-  const days = weekDays(day);
+  const days = weekDays(selectedDay);
+  const dayEvents = eventsOnDay(events, selectedDay);
+  const allDayEvs = dayEvents.filter((e) => e.allDay);
+  const timedEvs = dayEvents
+    .filter((e) => !e.allDay)
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
   return (
-    <div className="sm:hidden sticky top-0 z-20 border-b-2 border-brand-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between px-3 py-2 bg-brand-50/60">
-        <div className="text-sm font-semibold text-slate-700">
-          {fmtMonthYear(startOfWeek(day))} · Week {weekNum(day)}
-        </div>
-        <button onClick={onClose} className="text-xs text-slate-400 px-2 py-1">
-          Collapse ✕
-        </button>
-      </div>
-      <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
-        {days.map((d, i) => {
-          const dayEvents = eventsOnDay(events, d);
-          const selected = sameDay(d, day);
-          return (
-            <div key={i} className={`px-3 py-2.5 ${selected ? "bg-brand-50/40" : ""}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div
-                  className={`text-sm font-medium ${
-                    isToday(d) ? "text-brand-600" : selected ? "text-slate-800" : "text-slate-500"
+    <div className="sm:hidden flex flex-col h-full bg-white">
+      {/* Week strip */}
+      <div className="border-b border-slate-200 px-1 pt-2 pb-1 bg-white">
+        <div className="grid grid-cols-7">
+          {days.map((d, i) => {
+            const sel = sameDay(d, selectedDay);
+            const tod = isToday(d);
+            const hasEv = eventsOnDay(events, d).length > 0;
+            return (
+              <button
+                key={i}
+                onClick={() => onDayChange(d)}
+                className="flex flex-col items-center gap-[3px] py-1"
+              >
+                <span className="text-[11px] text-slate-400">{WEEK_LABELS[i].charAt(0)}</span>
+                <span
+                  className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
+                    sel
+                      ? "bg-brand-600 text-white font-semibold"
+                      : tod
+                      ? "text-brand-600 font-semibold"
+                      : "text-slate-700"
                   }`}
                 >
-                  {WEEK_LABELS[i]} {d.getDate()}
-                </div>
+                  {d.getDate()}
+                </span>
+                <span
+                  className={`w-1 h-1 rounded-full ${
+                    hasEv ? (sel ? "bg-white/70" : "bg-brand-400") : "invisible"
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Day title bar */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+        <button onClick={onClose} className="text-sm text-slate-500 flex items-center gap-1">
+          ‹ Month
+        </button>
+        <span className="text-sm font-semibold text-slate-700">
+          {selectedDay.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+        </span>
+        <button
+          onClick={() => onAddClick(selectedDay)}
+          className="text-sm bg-brand-600 text-white rounded-lg px-3 py-1.5"
+        >
+          ＋ Add
+        </button>
+      </div>
+
+      {/* Event list */}
+      <div className="flex-1 overflow-y-auto">
+        {dayEvents.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 pt-16 text-center px-8">
+            <p className="text-slate-200 text-5xl select-none">○</p>
+            <p className="text-slate-400 text-sm">No events</p>
+            <button
+              onClick={() => onAddClick(selectedDay)}
+              className="text-sm text-brand-600 font-medium"
+            >
+              ＋ Add an event
+            </button>
+          </div>
+        ) : (
+          <div className="px-4 py-3 space-y-2">
+            {allDayEvs.map((ev) => (
+              <button
+                key={ev.id}
+                onClick={() => onEventClick(ev)}
+                className={`w-full text-left rounded-xl px-4 py-3 flex items-center gap-2 ${eventPillClasses(ev)}`}
+              >
+                <span className="text-xs opacity-60 uppercase tracking-wider shrink-0">All day</span>
+                <span className="font-medium text-sm truncate">{ev.title || "(untitled)"}</span>
+              </button>
+            ))}
+            {timedEvs.map((ev) => {
+              const dotClass =
+                EVENT_COLOR_OPTIONS.find((o) => o.key === (ev.color ?? "default"))?.dot ?? "bg-brand-400";
+              return (
                 <button
-                  onClick={() => onAddClick(d)}
-                  className="text-xs text-brand-600 px-2.5 py-1.5 rounded-lg hover:bg-brand-50"
+                  key={ev.id}
+                  onClick={() => onEventClick(ev)}
+                  className="w-full text-left bg-white rounded-xl border border-slate-200 overflow-hidden flex active:bg-slate-50"
                 >
-                  ＋ Add
+                  <div className={`w-[5px] shrink-0 ${dotClass}`} />
+                  <div className="flex items-start gap-3 px-3 py-3 w-full min-w-0">
+                    <div className="text-xs text-slate-400 shrink-0 pt-0.5 min-w-[2.8rem] text-right leading-5">
+                      <div>{fmtTime(new Date(ev.start))}</div>
+                      <div className="opacity-60">{fmtTime(new Date(ev.end))}</div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-sm font-medium truncate ${
+                          ev.completed ? "line-through text-slate-400" : "text-slate-800"
+                        }`}
+                      >
+                        {ev.title || "(untitled)"}
+                      </p>
+                      {ev.location && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">{ev.location}</p>
+                      )}
+                      {!ev.location && ev.description && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">{ev.description}</p>
+                      )}
+                    </div>
+                  </div>
                 </button>
-              </div>
-              {dayEvents.length === 0 ? (
-                <div className="text-xs text-slate-300 py-1">No events</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {dayEvents.map((ev) => (
-                    <button
-                      key={ev.id}
-                      onClick={() => onEventClick(ev)}
-                      className={`block w-full text-left rounded-lg px-3 py-2.5 text-sm ${eventPillClasses(ev)}`}
-                    >
-                      {!ev.allDay && <span className="opacity-70 mr-2">{fmtTime(new Date(ev.start))}</span>}
-                      {ev.title || "(untitled)"}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

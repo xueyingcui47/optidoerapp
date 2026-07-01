@@ -68,6 +68,13 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => {
+                // 手机上点已经激活的 Calendar 标签：回到纯网格视图（收起 WeekAgenda）。
+                // CalendarPage 监听这个事件并把 selectedDay 清掉。
+                if (item.href === "/calendar" && active) {
+                  window.dispatchEvent(new Event("calendar:reset"));
+                }
+              }}
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] ${
                 active ? "text-brand-600" : "text-slate-500"
               }`}
