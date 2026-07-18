@@ -1,0 +1,25 @@
+{
+  "name": "OptiDoerApp — Notes · Calendar · Reminders",
+  "short_name": "OptiDoer",
+  "description": "Notes + Calendar + Reminders, with AI natural-language event creation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#3366f5",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
