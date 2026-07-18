@@ -61,7 +61,7 @@ function AuthForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 od-pop-in">
         <div className="text-3xl font-bold text-brand-600 mb-1">OptiDoerApp</div>
         <p className="text-slate-500 mb-6">Notes · Calendar · Reminders — with AI event creation</p>
 
@@ -224,7 +224,7 @@ export function ResetPasswordForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 od-pop-in">
         <div className="text-2xl font-bold text-slate-800 mb-1">Set a new password</div>
         <p className="text-slate-500 mb-6 text-sm">Choose a new password for your account.</p>
 
@@ -273,7 +273,7 @@ function LocalOnlyForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 od-pop-in">
         <div className="text-3xl font-bold text-brand-600 mb-1">OptiDoerApp</div>
         <p className="text-slate-500 mb-6">Notes · Calendar · Reminders — with AI event creation</p>
 

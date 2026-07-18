@@ -135,9 +135,9 @@ export function EventEditor({
 
   return (
     // 点对话框外面现在什么都不做（不保存也不关闭）——只能用叉叉或 Save/Cancel 按钮操作。
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4 od-overlay-in">
       <div
-        className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
+        className="w-full max-w-lg bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden od-pop-in"
         style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
       >
         <div
@@ -432,8 +432,8 @@ export function EventEditor({
 
       {/* Non-recurring delete: simple confirm so a stray tap can't wipe an event. */}
       {showDeleteConfirm && editingId && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4 od-overlay-in">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 od-pop-in">
             <h3 className="font-semibold text-slate-800 mb-2">Delete this event?</h3>
             <p className="text-sm text-slate-600 mb-4">This can't be undone.</p>
             <div className="flex justify-end gap-2">
@@ -460,8 +460,8 @@ export function EventEditor({
 
       {/* Recurring event delete: ask whether to truncate the series or remove all of it. */}
       {showDeleteChoice && editingId && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4 od-overlay-in">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 od-pop-in">
             <h3 className="font-semibold text-slate-800 mb-2">Delete recurring event</h3>
             <p className="text-sm text-slate-600 mb-4">
               This event repeats. Do you want to delete just this and all future occurrences, or

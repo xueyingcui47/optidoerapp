@@ -6,6 +6,89 @@
   color-scheme: light;
 }
 
+/* ===== 交互质感：全局点击反馈 + 弹窗登场动画 ===== */
+
+/* 去掉移动端点击时的灰色高亮方块，并消除 ~300ms 点击延迟 */
+button,
+a,
+[role="button"],
+label,
+select,
+summary {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 按钮 / 可点链接：平滑过渡 + 按下时轻微回弹（手机上也有"按下去"的手感） */
+button,
+a[href],
+[role="button"] {
+  transition: transform 120ms ease, background-color 150ms ease,
+    color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+button:active,
+a[href]:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+/* 禁用态不做按压反馈 */
+button:disabled,
+button:disabled:active {
+  transform: none;
+}
+
+/* 弹窗 / 卡片登场动画 */
+@keyframes od-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes od-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes od-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* 遮罩只淡透明度（用 both 防止首帧闪现），面板用 pop 但不保留 transform，
+   以免和 EventEditor 面板自身的拖拽 transform 冲突。 */
+.od-overlay-in {
+  animation: od-overlay-in 160ms ease-out both;
+}
+.od-pop-in {
+  animation: od-pop-in 190ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.od-fade-in {
+  animation: od-fade-in 220ms ease-out;
+}
+
+/* 尊重系统「减少动态效果」无障碍设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }

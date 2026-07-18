@@ -145,7 +145,7 @@ export function Paywall() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8 od-pop-in">
         <div className="text-center mb-6">
           <div className="text-2xl font-bold text-slate-800">Your trial has ended</div>
           <p className="text-slate-500 mt-1">
